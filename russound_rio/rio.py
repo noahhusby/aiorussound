@@ -154,8 +154,7 @@ class Russound:
 
         return ty, p['value']
 
-    @asyncio.coroutine
-    def _ioloop(self, reader, writer):
+    async def _ioloop(self, reader, writer):
         queue_future = ensure_future(
                 self._cmd_queue.get())
         net_future = ensure_future(
@@ -163,7 +162,7 @@ class Russound:
         try:
             logger.debug("Starting IO loop")
             while True:
-                done, pending = yield from asyncio.wait(
+                done, pending = await asyncio.wait(
                         [queue_future, net_future],
                         return_when=asyncio.FIRST_COMPLETED)
 
@@ -180,13 +179,13 @@ class Russound:
                     cmd, future = queue_future.result()
                     cmd += '\r'
                     writer.write(bytearray(cmd, 'utf-8'))
-                    yield from writer.drain()
+                    await writer.drain()
 
                     queue_future = ensure_future(
                             self._cmd_queue.get())
 
                     while True:
-                        response = yield from net_future
+                        response = await net_future
                         net_future = ensure_future(
                                 reader.readline())
                         try:
@@ -208,11 +207,10 @@ class Russound:
             logger.exception("Unhandled exception in IO loop")
             raise
 
-    @asyncio.coroutine
-    def _send_cmd(self, cmd):
+    async def _send_cmd(self, cmd):
         future = asyncio.Future()
-        yield from self._cmd_queue.put((cmd, future))
-        r = yield from future
+        await self._cmd_queue.put((cmd, future))
+        r = await future
         return r
 
     def add_zone_callback(self, callback):
@@ -243,40 +241,36 @@ class Russound:
         """
         self._source_callbacks.remove(callback)
 
-    @asyncio.coroutine
-    def connect(self):
+    async def connect(self):
         """
         Connect to the controller and start processing responses.
         """
         logger.info("Connecting to %s:%s", self._host, self._port)
-        reader, writer = yield from asyncio.open_connection(
+        reader, writer = await asyncio.open_connection(
                 self._host, self._port)
         self._ioloop_future = ensure_future(
                 self._ioloop(reader, writer))
         logger.info("Connected")
 
-    @asyncio.coroutine
-    def close(self):
+    async def close(self):
         """
         Disconnect from the controller.
         """
         logger.info("Closing connection to %s:%s", self._host, self._port)
         self._ioloop_future.cancel()
         try:
-            yield from self._ioloop_future
+            await self._ioloop_future
         except asyncio.CancelledError:
             pass
 
-    @asyncio.coroutine
-    def set_zone_variable(self, zone_id, variable, value):
+    async def set_zone_variable(self, zone_id, variable, value):
         """
         Set a zone variable to a new value.
         """
         return self._send_cmd("SET %s.%s=\"%s\"" % (
             zone_id.device_str(), variable, value))
 
-    @asyncio.coroutine
-    def get_zone_variable(self, zone_id, variable):
+    async def get_zone_variable(self, zone_id, variable):
         """ Retrieve the current value of a zone variable.  If the variable is
         not found in the local cache then the value is requested from the
         controller.  """
@@ -284,7 +278,7 @@ class Russound:
         try:
             return self._retrieve_cached_zone_variable(zone_id, variable)
         except UncachedVariable:
-            return (yield from self._send_cmd("GET %s.%s" % (
+            return (await self._send_cmd("GET %s.%s" % (
                 zone_id.device_str(), variable)))
 
     def get_cached_zone_variable(self, zone_id, variable, default=None):
@@ -296,56 +290,50 @@ class Russound:
         except UncachedVariable:
             return default
 
-    @asyncio.coroutine
-    def watch_zone(self, zone_id):
+    async def watch_zone(self, zone_id):
         """ Add a zone to the watchlist.
         Zones on the watchlist will push all
         state changes (and those of the source they are currently connected to)
         back to the client """
-        r = yield from self._send_cmd(
+        r = await self._send_cmd(
                 "WATCH %s ON" % (zone_id.device_str(), ))
         self._watched_zones.add(zone_id)
         return r
 
-    @asyncio.coroutine
-    def unwatch_zone(self, zone_id):
+    async def unwatch_zone(self, zone_id):
         """ Remove a zone from the watchlist. """
         self._watched_zones.remove(zone_id)
-        return (yield from
+        return (await
                 self._send_cmd("WATCH %s OFF" % (zone_id.device_str(), )))
 
-    @asyncio.coroutine
-    def send_zone_event(self, zone_id, event_name, *args):
+    async def send_zone_event(self, zone_id, event_name, *args):
         """ Send an event to a zone. """
         cmd = "EVENT %s!%s %s" % (
                 zone_id.device_str(), event_name,
                 " ".join(str(x) for x in args))
-        return (yield from self._send_cmd(cmd))
+        return (await self._send_cmd(cmd))
 
-    @asyncio.coroutine
-    def enumerate_zones(self):
+    async def enumerate_zones(self):
         """ Return a list of (zone_id, zone_name) tuples """
         zones = []
         for controller in range(1, 8):
             for zone in range(1, 17):
                 zone_id = ZoneID(zone, controller)
                 try:
-                    name = yield from self.get_zone_variable(zone_id, 'name')
+                    name = await self.get_zone_variable(zone_id, 'name')
                     if name:
                         zones.append((zone_id, name))
                 except CommandException:
                     break
         return zones
 
-    @asyncio.coroutine
-    def set_source_variable(self, source_id, variable, value):
+    async def set_source_variable(self, source_id, variable, value):
         """ Change the value of a source variable. """
         source_id = int(source_id)
         return self._send_cmd("SET S[%d].%s=\"%s\"" % (
             source_id, variable, value))
 
-    @asyncio.coroutine
-    def get_source_variable(self, source_id, variable):
+    async def get_source_variable(self, source_id, variable):
         """ Get the current value of a source variable. If the variable is not
         in the cache it will be retrieved from the controller. """
 
@@ -354,7 +342,7 @@ class Russound:
             return self._retrieve_cached_source_variable(
                     source_id, variable)
         except UncachedVariable:
-            return (yield from self._send_cmd("GET S[%d].%s" % (
+            return (await self._send_cmd("GET S[%d].%s" % (
                 source_id, variable)))
 
     def get_cached_source_variable(self, source_id, variable, default=None):
@@ -368,31 +356,28 @@ class Russound:
         except UncachedVariable:
             return default
 
-    @asyncio.coroutine
-    def watch_source(self, source_id):
+    async def watch_source(self, source_id):
         """ Add a souce to the watchlist. """
         source_id = int(source_id)
-        r = yield from self._send_cmd(
+        r = await self._send_cmd(
                 "WATCH S[%d] ON" % (source_id, ))
         self._watched_source.add(source_id)
         return r
 
-    @asyncio.coroutine
-    def unwatch_source(self, source_id):
+    async def unwatch_source(self, source_id):
         """ Remove a souce from the watchlist. """
         source_id = int(source_id)
         self._watched_sources.remove(source_id)
-        return (yield from
+        return (await
                 self._send_cmd("WATCH S[%d] OFF" % (
                     source_id, )))
 
-    @asyncio.coroutine
-    def enumerate_sources(self):
+    async def enumerate_sources(self):
         """ Return a list of (source_id, source_name) tuples """
         sources = []
         for source_id in range(1, 17):
             try:
-                name = yield from self.get_source_variable(source_id, 'name')
+                name = await self.get_source_variable(source_id, 'name')
                 if name:
                     sources.append((source_id, name))
             except CommandException:
