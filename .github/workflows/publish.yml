@@ -1,4 +1,4 @@
-name: Publish Python package to PyPI and TestPyPI
+name: publish
 
 on: push
 
