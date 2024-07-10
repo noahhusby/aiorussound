@@ -40,7 +40,7 @@ class ZoneID:
         self.controller = int(controller)
 
     def __str__(self):
-        return f"{self.controller}:{self.zone}" % (self.controller, self.zone)
+        return f"{self.controller}:{self.zone}"
 
     def __eq__(self, other):
         return (
