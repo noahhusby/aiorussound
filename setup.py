@@ -9,4 +9,6 @@ setup(
         url='https://github.com/noahhusby/russound_rio',
         description='Asyncio client for Russound RIO devices',
         long_description=open('README.md').read(),
+        long_description_content_type='text/markdown',
+
 )
