@@ -7,12 +7,17 @@ import sys
 import os
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), '..'))
 
-from russound_rio import Russound, ZoneID  # noqa: E402
-
+from aiorussound import Russound, ZoneID  # noqa: E402
 
 async def demo(loop, host):
     rus = Russound(loop, host)
     await rus.connect()
+
+    print("Finding controllers")
+    controllers = await rus.enumerate_controllers()
+
+    for controller_id, mac_address, controller_type in controllers:
+        print("%s (%s): %s" % (controller_id, mac_address, controller_type))
 
     print("Determining valid zones")
     # Determine Zones

@@ -3,25 +3,27 @@ import re
 import logging
 
 # Maintain compat with various 3.x async changes
-if hasattr(asyncio, 'ensure_future'):
+if hasattr(asyncio, "ensure_future"):
     ensure_future = asyncio.ensure_future
 else:
-    ensure_future = getattr(asyncio, 'async')
+    ensure_future = getattr(asyncio, "async")
 
-logger = logging.getLogger('russound')
+logger = logging.getLogger("russound")
 
 _re_response = re.compile(
-        r"(?:(?:S\[(?P<source>\d+)\])|(?:C\[(?P<controller>\d+)\]"
-        r".Z\[(?P<zone>\d+)\]))\.(?P<variable>\S+)=\"(?P<value>.*)\"")
+    r"(?:(?:S\[(?P<source>\d+)\])|(?:C\[(?P<controller>\d+)\](?:\.Z\[(?P<zone>\d+)\])?))\.(?P<variable>\S+)=\s*\"(?P<value>.*)\""
+)
 
 
 class CommandException(Exception):
-    """ A command sent to the controller caused an error. """
+    """A command sent to the controller caused an error."""
+
     pass
 
 
 class UncachedVariable(Exception):
-    """ A variable was not found in the cache. """
+    """A variable was not found in the cache."""
+
     pass
 
 
@@ -32,18 +34,21 @@ class ZoneID:
     Zones are identified by their zone index (1-N) within the controller they
     belong to and the controller index (1-N) within the entire system.
     """
+
     def __init__(self, zone, controller=1):
         self.zone = int(zone)
         self.controller = int(controller)
 
     def __str__(self):
-        return "%d:%d" % (self.controller, self.zone)
+        return f"{self.controller}:{self.zone}" % (self.controller, self.zone)
 
     def __eq__(self, other):
-        return hasattr(other, 'zone') and \
-                hasattr(other, 'controller') and \
-                other.zone == self.zone and \
-                other.controller == self.controller
+        return (
+            hasattr(other, "zone")
+            and hasattr(other, "controller")
+            and other.zone == self.zone
+            and other.controller == self.controller
+        )
 
     def __hash__(self):
         return hash(str(self))
@@ -53,7 +58,7 @@ class ZoneID:
         Generate a string that can be used to reference this zone in a RIO
         command
         """
-        return "C[%d].Z[%d]" % (self.controller, self.zone)
+        return f"C[{self.controller}].Z[{self.zone}]"
 
 
 class Russound:
@@ -71,6 +76,7 @@ class Russound:
         self._cmd_queue = asyncio.Queue()
         self._source_state = {}
         self._zone_state = {}
+        self._controller_state = {}
         self._watched_zones = set()
         self._watched_sources = set()
         self._zone_callbacks = []
@@ -84,8 +90,9 @@ class Russound:
         """
         try:
             s = self._zone_state[zone_id][name.lower()]
-            logger.debug("Zone Cache retrieve %s.%s = %s",
-                         zone_id.device_str(), name, s)
+            logger.debug(
+                "Zone Cache retrieve %s.%s = %s", zone_id.device_str(), name, s
+            )
             return s
         except KeyError:
             raise UncachedVariable
@@ -98,8 +105,7 @@ class Russound:
         zone_state = self._zone_state.setdefault(zone_id, {})
         name = name.lower()
         zone_state[name] = value
-        logger.debug("Zone Cache store %s.%s = %s",
-                     zone_id.device_str(), name, value)
+        logger.debug("Zone Cache store %s.%s = %s", zone_id.device_str(), name, value)
         for callback in self._zone_callbacks:
             callback(zone_id, name, value)
 
@@ -111,8 +117,7 @@ class Russound:
         """
         try:
             s = self._source_state[source_id][name.lower()]
-            logger.debug("Source Cache retrieve S[%d].%s = %s",
-                         source_id, name, s)
+            logger.debug("Source Cache retrieve S[%d].%s = %s", source_id, name, s)
             return s
         except KeyError:
             raise UncachedVariable
@@ -125,15 +130,38 @@ class Russound:
         source_state = self._source_state.setdefault(source_id, {})
         name = name.lower()
         source_state[name] = value
-        logger.debug("Source Cache store S[%d].%s = %s",
-                     source_id, name, value)
+        logger.debug("Source Cache store S[%d].%s = %s", source_id, name, value)
         for callback in self._source_callbacks:
             callback(source_id, name, value)
 
+    def _retrieve_cached_controller_variable(self, controller_id, name):
+        """
+        Retrieves the cache state of the named variable for a particular
+        controller. If the variable has not been cached then the UncachedVariable
+        exception is raised.
+        """
+        try:
+            s = self._controller_state[controller_id][name.lower()]
+            logger.debug(
+                "Controller Cache retrieve C[%d].%s = %s", controller_id, name, s
+            )
+            return s
+        except KeyError:
+            raise UncachedVariable
+
+    def _store_cached_controller_variable(self, controller_id, name, value):
+        """
+        Stores the current known value of a controller variable into the cache.
+        """
+        controller_state = self._controller_state.setdefault(controller_id, {})
+        name = name.lower()
+        controller_state[name] = value
+        logger.debug("Controller Cache store C[%d].%s = %s", controller_id, name, value)
+
     def _process_response(self, res):
-        s = str(res, 'utf-8').strip()
+        s = str(res, "utf-8").strip()
         ty, payload = s[0], s[2:]
-        if ty == 'E':
+        if ty == "E":
             logger.debug("Device responded with error: %s", payload)
             raise CommandException(payload)
 
@@ -142,29 +170,24 @@ class Russound:
             return ty, None
 
         p = m.groupdict()
-        if p['source']:
-            source_id = int(p['source'])
-            self._store_cached_source_variable(
-                    source_id, p['variable'], p['value'])
-        elif p['zone']:
-            zone_id = ZoneID(controller=p['controller'], zone=p['zone'])
-            self._store_cached_zone_variable(zone_id,
-                                             p['variable'],
-                                             p['value'])
+        if p["source"]:
+            source_id = int(p["source"])
+            self._store_cached_source_variable(source_id, p["variable"], p["value"])
+        elif p["zone"]:
+            zone_id = ZoneID(controller=p["controller"], zone=p["zone"])
+            self._store_cached_zone_variable(zone_id, p["variable"], p["value"])
 
-        return ty, p['value']
+        return ty, p["value"]
 
     async def _ioloop(self, reader, writer):
-        queue_future = ensure_future(
-                self._cmd_queue.get())
-        net_future = ensure_future(
-                reader.readline())
+        queue_future = ensure_future(self._cmd_queue.get())
+        net_future = ensure_future(reader.readline())
         try:
             logger.debug("Starting IO loop")
             while True:
                 done, pending = await asyncio.wait(
-                        [queue_future, net_future],
-                        return_when=asyncio.FIRST_COMPLETED)
+                    [queue_future, net_future], return_when=asyncio.FIRST_COMPLETED
+                )
 
                 if net_future in done:
                     response = net_future.result()
@@ -172,25 +195,22 @@ class Russound:
                         self._process_response(response)
                     except CommandException:
                         pass
-                    net_future = ensure_future(
-                            reader.readline())
+                    net_future = ensure_future(reader.readline())
 
                 if queue_future in done:
                     cmd, future = queue_future.result()
-                    cmd += '\r'
-                    writer.write(bytearray(cmd, 'utf-8'))
+                    cmd += "\r"
+                    writer.write(bytearray(cmd, "utf-8"))
                     await writer.drain()
 
-                    queue_future = ensure_future(
-                            self._cmd_queue.get())
+                    queue_future = ensure_future(self._cmd_queue.get())
 
                     while True:
                         response = await net_future
-                        net_future = ensure_future(
-                                reader.readline())
+                        net_future = ensure_future(reader.readline())
                         try:
                             ty, value = self._process_response(response)
-                            if ty == 'S':
+                            if ty == "S":
                                 future.set_result(value)
                                 break
                         except CommandException as e:
@@ -246,10 +266,8 @@ class Russound:
         Connect to the controller and start processing responses.
         """
         logger.info("Connecting to %s:%s", self._host, self._port)
-        reader, writer = await asyncio.open_connection(
-                self._host, self._port)
-        self._ioloop_future = ensure_future(
-                self._ioloop(reader, writer))
+        reader, writer = await asyncio.open_connection(self._host, self._port)
+        self._ioloop_future = ensure_future(self._ioloop(reader, writer))
         logger.info("Connected")
 
     async def close(self):
@@ -267,60 +285,88 @@ class Russound:
         """
         Set a zone variable to a new value.
         """
-        return self._send_cmd("SET %s.%s=\"%s\"" % (
-            zone_id.device_str(), variable, value))
+        return self._send_cmd(f'SET {zone_id.device_str()}.{variable}="{value}"')
 
     async def get_zone_variable(self, zone_id, variable):
-        """ Retrieve the current value of a zone variable.  If the variable is
+        """Retrieve the current value of a zone variable.  If the variable is
         not found in the local cache then the value is requested from the
-        controller.  """
+        controller."""
 
         try:
             return self._retrieve_cached_zone_variable(zone_id, variable)
         except UncachedVariable:
-            return (await self._send_cmd("GET %s.%s" % (
-                zone_id.device_str(), variable)))
+            return await self._send_cmd(f"GET {zone_id.device_str()}.{variable}")
 
     def get_cached_zone_variable(self, zone_id, variable, default=None):
-        """ Retrieve the current value of a zone variable from the cache or
-        return the default value if the variable is not present. """
+        """Retrieve the current value of a zone variable from the cache or
+        return the default value if the variable is not present."""
 
         try:
             return self._retrieve_cached_zone_variable(zone_id, variable)
         except UncachedVariable:
             return default
 
+    async def get_controller_variable(self, controller_id, variable):
+        """Get the current value of a controller variable. If the variable is not
+        in the cache it will be retrieved from the controller."""
+
+        controller_id = int(controller_id)
+        try:
+            return self._retrieve_cached_controller_variable(controller_id, variable)
+        except UncachedVariable:
+            return await self._send_cmd(f"GET C[{controller_id}].{variable}")
+
+    async def enumerate_controllers(self):
+        """Return a list of (controller_id, controller_macAddress, controller_type) tuples"""
+        controllers = []
+        for controller_id in range(1, 8):
+            try:
+                mac_address = await self.get_controller_variable(
+                    controller_id, "macAddress"
+                )
+                if not mac_address:
+                    continue
+                controller_type = await self.get_controller_variable(
+                    controller_id, "type"
+                )
+                if controller_type:
+                    controllers.append((controller_id, mac_address, controller_type))
+            except CommandException:
+                continue
+
+        return controllers
+
     async def watch_zone(self, zone_id):
-        """ Add a zone to the watchlist.
+        """Add a zone to the watchlist.
         Zones on the watchlist will push all
         state changes (and those of the source they are currently connected to)
-        back to the client """
-        r = await self._send_cmd(
-                "WATCH %s ON" % (zone_id.device_str(), ))
+        back to the client"""
+        r = await self._send_cmd(f"WATCH {zone_id.device_str()} ON")
         self._watched_zones.add(zone_id)
         return r
 
     async def unwatch_zone(self, zone_id):
-        """ Remove a zone from the watchlist. """
+        """Remove a zone from the watchlist."""
         self._watched_zones.remove(zone_id)
-        return (await
-                self._send_cmd("WATCH %s OFF" % (zone_id.device_str(), )))
+        return await self._send_cmd(f"WATCH {zone_id.device(str())} OFF")
 
     async def send_zone_event(self, zone_id, event_name, *args):
-        """ Send an event to a zone. """
+        """Send an event to a zone."""
         cmd = "EVENT %s!%s %s" % (
-                zone_id.device_str(), event_name,
-                " ".join(str(x) for x in args))
-        return (await self._send_cmd(cmd))
+            zone_id.device_str(),
+            event_name,
+            " ".join(str(x) for x in args),
+        )
+        return await self._send_cmd(cmd)
 
     async def enumerate_zones(self):
-        """ Return a list of (zone_id, zone_name) tuples """
+        """Return a list of (zone_id, zone_name) tuples"""
         zones = []
         for controller in range(1, 8):
             for zone in range(1, 17):
                 zone_id = ZoneID(zone, controller)
                 try:
-                    name = await self.get_zone_variable(zone_id, 'name')
+                    name = await self.get_zone_variable(zone_id, "name")
                     if name:
                         zones.append((zone_id, name))
                 except CommandException:
@@ -328,56 +374,51 @@ class Russound:
         return zones
 
     async def set_source_variable(self, source_id, variable, value):
-        """ Change the value of a source variable. """
+        """Change the value of a source variable."""
         source_id = int(source_id)
-        return self._send_cmd("SET S[%d].%s=\"%s\"" % (
-            source_id, variable, value))
+        return self._send_cmd(
+            f'SET S[{source_id}].{variable}="{value}"' % (source_id, variable, value)
+        )
 
     async def get_source_variable(self, source_id, variable):
-        """ Get the current value of a source variable. If the variable is not
-        in the cache it will be retrieved from the controller. """
+        """Get the current value of a source variable. If the variable is not
+        in the cache it will be retrieved from the controller."""
 
         source_id = int(source_id)
         try:
-            return self._retrieve_cached_source_variable(
-                    source_id, variable)
+            return self._retrieve_cached_source_variable(source_id, variable)
         except UncachedVariable:
-            return (await self._send_cmd("GET S[%d].%s" % (
-                source_id, variable)))
+            return await self._send_cmd(f"GET S[{source_id}].{variable}")
 
     def get_cached_source_variable(self, source_id, variable, default=None):
-        """ Get the cached value of a source variable. If the variable is not
-        cached return the default value. """
+        """Get the cached value of a source variable. If the variable is not
+        cached return the default value."""
 
         source_id = int(source_id)
         try:
-            return self._retrieve_cached_source_variable(
-                    source_id, variable)
+            return self._retrieve_cached_source_variable(source_id, variable)
         except UncachedVariable:
             return default
 
     async def watch_source(self, source_id):
-        """ Add a souce to the watchlist. """
+        """Add a souce to the watchlist."""
         source_id = int(source_id)
-        r = await self._send_cmd(
-                "WATCH S[%d] ON" % (source_id, ))
-        self._watched_source.add(source_id)
+        r = await self._send_cmd(f"WATCH S[{source_id}] ON")
+        self._watched_sources.add(source_id)
         return r
 
     async def unwatch_source(self, source_id):
-        """ Remove a souce from the watchlist. """
+        """Remove a souce from the watchlist."""
         source_id = int(source_id)
         self._watched_sources.remove(source_id)
-        return (await
-                self._send_cmd("WATCH S[%d] OFF" % (
-                    source_id, )))
+        return await self._send_cmd(f"WATCH S[{source_id}] OFF")
 
     async def enumerate_sources(self):
-        """ Return a list of (source_id, source_name) tuples """
+        """Return a list of (source_id, source_name) tuples"""
         sources = []
         for source_id in range(1, 17):
             try:
-                name = await self.get_source_variable(source_id, 'name')
+                name = await self.get_source_variable(source_id, "name")
                 if name:
                     sources.append((source_id, name))
             except CommandException:

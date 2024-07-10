@@ -1,4 +1,4 @@
-from russound_rio import ZoneID
+from aiorussound import ZoneID
 
 
 def test_device_str():
