@@ -10,6 +10,8 @@
 )](https://pypi.org/project/aiorussound/)
 [![](https://img.shields.io/pypi/v/aiorussound
 )](https://pypi.org/project/aiorussound/)
+[![](https://img.shields.io/pypi/dm/aiorussound
+)](https://pypi.org/project/aiorussound/)
 
 </div>
 
