@@ -1,7 +1,8 @@
 from .rio import (
-        CommandException,
-        UncachedVariable,
-        ZoneID,
-        Russound)
+    CommandException,
+    UncachedVariable,
+    ZoneID,
+    Russound,
+    Controller)
 
-__all__ = [CommandException, UncachedVariable, ZoneID, Russound]
+__all__ = ["CommandException", "UncachedVariable", "ZoneID", "Russound", "Controller"]

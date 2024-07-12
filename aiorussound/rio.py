@@ -27,6 +27,29 @@ class UncachedVariable(Exception):
     pass
 
 
+class Controller:
+    """Uniquely identifies a controller"""
+
+    def __init__(self, controller_id: int, mac_address: str, model: str):
+        self.controller_id = controller_id
+        self.mac_address = mac_address
+        self.model = model
+        self.zones = {}
+        # TODO: Metadata fetching
+
+    def __str__(self):
+        return f"{self.controller_id}"
+
+    def __eq__(self, other):
+        return (
+                hasattr(other, "controller_id")
+                and other.controller_id == self.controller_id
+        )
+
+    def __hash__(self):
+        return hash(str(self))
+
+
 class ZoneID:
     """Uniquely identifies a zone
 
@@ -44,10 +67,10 @@ class ZoneID:
 
     def __eq__(self, other):
         return (
-            hasattr(other, "zone")
-            and hasattr(other, "controller")
-            and other.zone == self.zone
-            and other.controller == self.controller
+                hasattr(other, "zone")
+                and hasattr(other, "controller")
+                and other.zone == self.zone
+                and other.controller == self.controller
         )
 
     def __hash__(self):
