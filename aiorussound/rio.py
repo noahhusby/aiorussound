@@ -46,16 +46,16 @@ class Russound:
         self._zone_callbacks = []
         self._source_callbacks = []
 
-    def _retrieve_cached_zone_variable(self, zone_id, name):
+    def _retrieve_cached_zone_variable(self, controller_id, zone_id, name):
         """
         Retrieves the cache state of the named variable for a particular
         zone. If the variable has not been cached then the UncachedVariable
         exception is raised.
         """
         try:
-            s = self._zone_state[zone_id][name.lower()]
+            s = self._zone_state[f"C[{controller_id}].Z[{zone_id}]"][name.lower()]
             logger.debug(
-                "Zone Cache retrieve %s.%s = %s", zone_id.device_str(), name, s
+                "Zone Cache retrieve %s.%s = %s", f"C[{controller_id}.Z[{zone_id}]", name, s
             )
             return s
         except KeyError:
@@ -228,22 +228,22 @@ class Russound:
         """
         return self._send_cmd(f'SET {zone_id.device_str()}.{variable}="{value}"')
 
-    async def get_zone_variable(self, zone_id, variable):
+    async def get_zone_variable(self, controller_id, zone_id, variable):
         """Retrieve the current value of a zone variable.  If the variable is
         not found in the local cache then the value is requested from the
         controller."""
 
         try:
-            return self._retrieve_cached_zone_variable(zone_id, variable)
+            return self._retrieve_cached_zone_variable(controller_id, zone_id, variable)
         except UncachedVariable:
-            return await self._send_cmd(f"GET {zone_id.device_str()}.{variable}")
+            return await self._send_cmd(f"GET C[{controller_id}].Z[{zone_id}].{variable}")
 
-    def get_cached_zone_variable(self, zone_id, variable, default=None):
+    def get_cached_zone_variable(self, controller_id, zone_id, variable, default=None):
         """Retrieve the current value of a zone variable from the cache or
         return the default value if the variable is not present."""
 
         try:
-            return self._retrieve_cached_zone_variable(zone_id, variable)
+            return self._retrieve_cached_zone_variable(controller_id, zone_id, variable)
         except UncachedVariable:
             return default
 
@@ -272,32 +272,11 @@ class Russound:
 
         return controllers
 
-    async def watch_zone(self, zone_id):
-        """Add a zone to the watchlist.
-        Zones on the watchlist will push all
-        state changes (and those of the source they are currently connected to)
-        back to the client"""
-        r = await self._send_cmd(f"WATCH {zone_id.device_str()} ON")
-        return r
-
-    async def unwatch_zone(self, zone_id):
-        """Remove a zone from the watchlist."""
-        return await self._send_cmd(f"WATCH {zone_id.device(str())} OFF")
-
-    async def send_zone_event(self, zone_id, event_name, *args):
-        """Send an event to a zone."""
-        cmd = "EVENT %s!%s %s" % (
-            zone_id.device_str(),
-            event_name,
-            " ".join(str(x) for x in args),
-        )
-        return await self._send_cmd(cmd)
-
     async def set_source_variable(self, source_id, variable, value):
         """Change the value of a source variable."""
         source_id = int(source_id)
         return self._send_cmd(
-            f'SET S[{source_id}].{variable}="{value}"' % (source_id, variable, value)
+            f'SET S[{source_id}].{variable}="{value}"'
         )
 
     async def get_source_variable(self, source_id, variable):
@@ -406,12 +385,13 @@ class Controller:
     async def enumerate_zones(self):
         """Return a list of (zone_id, zone_name) tuples"""
         zones = []
-        for zone in range(1, self.max_zones):
-            zone_id = Zone(zone, self)
+        for zone_id in range(1, self.max_zones):
+            zone = Zone(self.instance, self, zone_id, "")
             try:
-                name = await self.instance.get_zone_variable(zone_id, "name")
+                #
+                name = await self.instance.get_zone_variable(self.controller_id, zone_id, "name")
                 if name:
-                    zones.append((zone_id, name))
+                    zones.append((zone_id, zone))
             except CommandException:
                 break
         return zones
@@ -425,18 +405,20 @@ class Zone:
     belong to and the controller index (1-N) within the entire system.
     """
 
-    def __init__(self, zone, controller: Controller):
-        self.zone = int(zone)
+    def __init__(self, instance: Russound, controller: Controller, zone_id: int, name: str):
+        self.instance = instance
         self.controller = controller
+        self.zone_id = int(zone_id)
+        self.name = name
 
     def __str__(self):
-        return f"{self.controller}:{self.zone}"
+        return f"{self.controller.controller_id}:{self.zone_id}"
 
     def __eq__(self, other):
         return (
                 hasattr(other, "zone")
                 and hasattr(other, "controller")
-                and other.zone == self.zone
+                and other.zone == self.zone_id
                 and other.controller == self.controller
         )
 
@@ -448,6 +430,97 @@ class Zone:
         Generate a string that can be used to reference this zone in a RIO
         command
         """
-        return f"C[{self.controller}].Z[{self.zone}]"
+        return f"C[{self.controller.controller_id}].Z[{self.zone_id}]"
 
+    async def watch(self):
+        """Add a zone to the watchlist.
+        Zones on the watchlist will push all
+        state changes (and those of the source they are currently connected to)
+        back to the client"""
+        r = await self.instance._send_cmd(f"WATCH {self.device_str()} ON")
+        return r
+
+    async def unwatch(self):
+        """Remove a zone from the watchlist."""
+        return await self.instance._send_cmd(f"WATCH {self.device_str()} OFF")
+
+    async def send_event(self, event_name, *args):
+        """Send an event to a zone."""
+        cmd = "EVENT %s!%s %s" % (
+            self.device_str(),
+            event_name,
+            " ".join(str(x) for x in args),
+        )
+        return await self.instance._send_cmd(cmd)
+
+    async def _get(self, variable):
+        return await self.instance.get_zone_variable(self.controller.controller_id, self.zone_id, variable)
+
+    @property
+    def current_source(self):
+        return self._get('currentSource')
+
+    @property
+    def volume(self):
+        return self._get('volume')
+
+    @property
+    def bass(self):
+        return self._get('bass')
+
+    @property
+    def treble(self):
+        return self._get('treble')
+
+    @property
+    def balance(self):
+        return self._get('balance')
+
+    @property
+    def loudness(self):
+        return self._get('loudness')
+
+    @property
+    def turn_on_volume(self):
+        return self._get('turnOnVolume')
+
+    @property
+    def do_not_disturb(self):
+        return self._get('doNotDisturb')
+
+    @property
+    def party_mode(self):
+        return self._get('partyMode')
+
+    @property
+    def status(self):
+        return self._get('status')
+
+    @property
+    def mute(self):
+        return self._get('mute')
+
+    @property
+    def shared_source(self):
+        return self._get('sharedSource')
+
+    @property
+    def last_error(self):
+        return self._get('lastError')
+
+    @property
+    def page(self):
+        return self._get('page')
+
+    @property
+    def sleep_time_default(self):
+        return self._get('sleepTimeDefault')
+
+    @property
+    def sleep_time_remaining(self):
+        return self._get('sleepTimeRemaining')
+
+    @property
+    def enabled(self):
+        return self._get('enabled')
 

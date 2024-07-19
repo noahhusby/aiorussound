@@ -23,8 +23,8 @@ async def demo(loop, host):
         # Determine Zones
         valid_zones = await c.enumerate_zones()
 
-        for zone_id, name in valid_zones:
-            print("%s: %s" % (zone_id, name))
+        for zone_id, zone in valid_zones:
+            print("%s: %s" % (zone_id, await zone.turn_on_volume))
 
         sources = await rus.enumerate_sources()
         for source_id, name in sources:
