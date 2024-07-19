@@ -8,10 +8,11 @@ if hasattr(asyncio, "ensure_future"):
 else:
     ensure_future = getattr(asyncio, "async")
 
-logger = logging.getLogger("russound")
+_LOGGER = logging.getLogger(__package__)
 
 _re_response = re.compile(
-    r"(?:(?:S\[(?P<source>\d+)\])|(?:C\[(?P<controller>\d+)\](?:\.Z\[(?P<zone>\d+)\])?))\.(?P<variable>\S+)=\s*\"(?P<value>.*)\""
+    r"(?:(?:C\[(?P<controller>\d+)](?:\.Z\[(?P<zone>\d+)])?|C\[(?P<controller_alt>\d+)]\.S\[(?P<source>\d+)])?\.("
+    r"?P<variable>\S+)|(?P<variable_no_prefix>\S+))=\s*\"(?P<value>.*)\""
 )
 
 
@@ -24,6 +25,11 @@ class CommandException(Exception):
 class UncachedVariable(Exception):
     """A variable was not found in the cache."""
 
+    pass
+
+
+class UnsupportedFeature(Exception):
+    """A requested command is not supported on this controller"""
     pass
 
 
@@ -54,7 +60,7 @@ class Russound:
         """
         try:
             s = self._zone_state[f"C[{controller_id}].Z[{zone_id}]"][name.lower()]
-            logger.debug(
+            _LOGGER.debug(
                 "Zone Cache retrieve %s.%s = %s", f"C[{controller_id}.Z[{zone_id}]", name, s
             )
             return s
@@ -69,7 +75,7 @@ class Russound:
         zone_state = self._zone_state.setdefault(zone_id, {})
         name = name.lower()
         zone_state[name] = value
-        logger.debug("Zone Cache store %s.%s = %s", zone_id.device_str(), name, value)
+        _LOGGER.debug("Zone Cache store %s.%s = %s", zone_id.device_str(), name, value)
         for callback in self._zone_callbacks:
             callback(zone_id, name, value)
 
@@ -81,7 +87,7 @@ class Russound:
         """
         try:
             s = self._source_state[source_id][name.lower()]
-            logger.debug("Source Cache retrieve S[%d].%s = %s", source_id, name, s)
+            _LOGGER.debug("Source Cache retrieve S[%d].%s = %s", source_id, name, s)
             return s
         except KeyError:
             raise UncachedVariable
@@ -94,7 +100,7 @@ class Russound:
         source_state = self._source_state.setdefault(source_id, {})
         name = name.lower()
         source_state[name] = value
-        logger.debug("Source Cache store S[%d].%s = %s", source_id, name, value)
+        _LOGGER.debug("Source Cache store S[%d].%s = %s", source_id, name, value)
         for callback in self._source_callbacks:
             callback(source_id, name, value)
 
@@ -102,7 +108,7 @@ class Russound:
         s = str(res, "utf-8").strip()
         ty, payload = s[0], s[2:]
         if ty == "E":
-            logger.debug("Device responded with error: %s", payload)
+            _LOGGER.debug("Device responded with error: %s", payload)
             raise CommandException(payload)
 
         m = _re_response.match(payload)
@@ -124,7 +130,7 @@ class Russound:
         queue_future = ensure_future(self._cmd_queue.get())
         net_future = ensure_future(reader.readline())
         try:
-            logger.debug("Starting IO loop")
+            _LOGGER.debug("Starting IO loop")
             while True:
                 done, pending = await asyncio.wait(
                     [queue_future, net_future], return_when=asyncio.FIRST_COMPLETED
@@ -206,16 +212,16 @@ class Russound:
         """
         Connect to the controller and start processing responses.
         """
-        logger.info("Connecting to %s:%s", self._host, self._port)
+        _LOGGER.info("Connecting to %s:%s", self._host, self._port)
         reader, writer = await asyncio.open_connection(self._host, self._port)
         self._ioloop_future = ensure_future(self._ioloop(reader, writer))
-        logger.info("Connected")
+        _LOGGER.info("Connected")
 
     async def close(self):
         """
         Disconnect from the controller.
         """
-        logger.info("Closing connection to %s:%s", self._host, self._port)
+        _LOGGER.info("Closing connection to %s:%s", self._host, self._port)
         self._ioloop_future.cancel()
         try:
             await self._ioloop_future
@@ -340,7 +346,7 @@ class Russound:
         """
         try:
             s = self._controller_state[controller_id][name.lower()]
-            logger.debug(
+            _LOGGER.debug(
                 "Controller Cache retrieve C[%d].%s = %s", controller_id, name, s
             )
             return s
@@ -354,13 +360,18 @@ class Russound:
         controller_state = self._controller_state.setdefault(controller_id, {})
         name = name.lower()
         controller_state[name] = value
-        logger.debug("Controller Cache store C[%d].%s = %s", controller_id, name, value)
+        _LOGGER.debug("Controller Cache store C[%d].%s = %s", controller_id, name, value)
+
+    @property
+    def api_version(self):
+        return self._send_cmd("VERSION")
 
 
 class Controller:
     """Uniquely identifies a controller"""
 
-    def __init__(self, instance: Russound, controller_id: int, mac_address: str, controller_type: str, firmware_version: str):
+    def __init__(self, instance: Russound, controller_id: int, mac_address: str, controller_type: str,
+                 firmware_version: str):
         self.instance = instance
         self.controller_id = controller_id
         self.mac_address = mac_address
@@ -523,4 +534,3 @@ class Zone:
     @property
     def enabled(self):
         return self._get('enabled')
-

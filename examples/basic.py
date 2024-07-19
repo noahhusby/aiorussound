@@ -5,14 +5,15 @@ import logging
 # is used for tests.
 import sys
 import os
+
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), '..'))
 
 from aiorussound import Russound  # noqa: E402
 
+
 async def demo(loop, host):
     rus = Russound(loop, host)
     await rus.connect()
-
     print("Finding controllers")
     controllers = await rus.enumerate_controllers()
 
@@ -24,7 +25,7 @@ async def demo(loop, host):
         valid_zones = await c.enumerate_zones()
 
         for zone_id, zone in valid_zones:
-            print("%s: %s" % (zone_id, await zone.turn_on_volume))
+            print("%s: %s" % (zone_id, await zone.volume))
 
         sources = await rus.enumerate_sources()
         for source_id, name in sources:
