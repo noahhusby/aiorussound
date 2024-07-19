@@ -163,15 +163,15 @@ class Russound:
                         except CommandException as e:
                             future.set_exception(e)
                             break
-            logger.debug("IO loop exited")
+            _LOGGER.debug("IO loop exited")
         except asyncio.CancelledError:
-            logger.debug("IO loop cancelled")
+            _LOGGER.debug("IO loop cancelled")
             writer.close()
             queue_future.cancel()
             net_future.cancel()
             raise
         except Exception:
-            logger.exception("Unhandled exception in IO loop")
+            _LOGGER.exception("Unhandled exception in IO loop")
             raise
 
     async def _send_cmd(self, cmd):

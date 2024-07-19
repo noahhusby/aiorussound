@@ -6,6 +6,9 @@ import logging
 import sys
 import os
 
+from aiorussound.const import FeatureFlag
+from aiorussound.util import is_fw_version_higher, check_feature_flag
+
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), '..'))
 
 from aiorussound import Russound  # noqa: E402
