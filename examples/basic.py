@@ -30,6 +30,7 @@ async def demo(loop, host):
         valid_zones = await c.enumerate_zones()
 
         for zone_id, zone in valid_zones:
+            await zone.watch()
             print("%s: %s" % (zone_id, await zone.volume))
 
         sources = await rus.enumerate_sources()
