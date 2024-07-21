@@ -30,6 +30,7 @@ async def demo(loop, host):
         valid_zones = await c.enumerate_zones()
 
         for zone_id, zone in valid_zones:
+            await zone.watch()
             print("%s: %s" % (zone_id, await zone.volume))
 
         sources = await rus.enumerate_sources()
@@ -45,6 +46,9 @@ async def demo(loop, host):
         # source = rus.get_cached_zone_variable(ZoneID(1), "currentsource")
         # name = await rus.get_source_variable(source, 'name')
         # print("Zone 1 source name: %s" % name)
+        await asyncio.sleep(5.0)
+        for zone_id, zone in valid_zones:
+            print("%s: %s" % (zone_id, await zone.volume))
     await rus.close()
     print("Done")
 

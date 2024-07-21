@@ -4,7 +4,7 @@ import logging
 
 from aiorussound.const import FeatureFlag, MINIMUM_API_SUPPORT, FLAGS_BY_VERSION
 from aiorussound.exceptions import UncachedVariable, CommandException, UnsupportedRussoundVersion
-from aiorussound.util import is_feature_supported, is_fw_version_higher
+from aiorussound.util import is_feature_supported, is_fw_version_higher, form_zone_device_str
 
 # Maintain compat with various 3.x async changes
 if hasattr(asyncio, "ensure_future"):
@@ -38,6 +38,8 @@ class Russound:
         self._controller_state = {}
         self._zone_callbacks = []
         self._source_callbacks = []
+        self._connection_started = False
+        self._watched_devices = {}
         self.rio_version = None
 
     def _retrieve_cached_zone_variable(self, controller_id, zone_id, name):
@@ -55,17 +57,18 @@ class Russound:
         except KeyError:
             raise UncachedVariable
 
-    def _store_cached_zone_variable(self, zone_id, name, value):
+    def _store_cached_zone_variable(self, controller_id, zone_id, name, value):
         """
         Stores the current known value of a zone variable into the cache.
         Calls any zone callbacks.
         """
-        zone_state = self._zone_state.setdefault(zone_id, {})
+        device_str = form_zone_device_str(controller_id, zone_id)
+        zone_state = self._zone_state.setdefault(device_str, {})
         name = name.lower()
         zone_state[name] = value
-        _LOGGER.debug("Zone Cache store %s.%s = %s", zone_id.device_str(), name, value)
+        _LOGGER.debug("Zone Cache store %s.%s = %s", device_str, name, value)
         for callback in self._zone_callbacks:
-            callback(zone_id, name, value)
+            callback(device_str, name, value)
 
     def _retrieve_cached_source_variable(self, source_id, name):
         """
@@ -108,13 +111,13 @@ class Russound:
             source_id = int(p["source"])
             self._store_cached_source_variable(source_id, p["variable"], p["value"])
         elif p["zone"]:
-            print(")")
-            # zone_id = ZoneID(controller=p["controller"], zone=p["zone"])
-            # self._store_cached_zone_variable(zone_id, p["variable"], p["value"])
+            controller_id = int(p["controller"])
+            zone_id = int(p["zone"])
+            self._store_cached_zone_variable(controller_id, zone_id, p["variable"], p["value"])
 
         return ty, p["value"]
 
-    async def _ioloop(self, reader, writer):
+    async def _ioloop(self, reader, writer, reconnect):
         queue_future = ensure_future(self._cmd_queue.get())
         net_future = ensure_future(reader.readline())
         try:
@@ -151,16 +154,24 @@ class Russound:
                         except CommandException as e:
                             future.set_exception(e)
                             break
-            _LOGGER.debug("IO loop exited")
         except asyncio.CancelledError:
             _LOGGER.debug("IO loop cancelled")
             writer.close()
             queue_future.cancel()
             net_future.cancel()
             raise
+        except asyncio.TimeoutError:
+            _LOGGER.warning("Connection to Russound client timed out")
+        except ConnectionResetError:
+            _LOGGER.warning("Connection to Russound client reset")
         except Exception:
             _LOGGER.exception("Unhandled exception in IO loop")
             raise
+        finally:
+            if reconnect and self._connection_started:
+                _LOGGER.info("Retrying connection to Russound client in 5s")
+                await asyncio.sleep(5.0)
+                await self.connect(reconnect)
 
     async def _send_cmd(self, cmd):
         future = asyncio.Future()
@@ -196,24 +207,26 @@ class Russound:
         """
         self._source_callbacks.remove(callback)
 
-    async def connect(self):
+    async def connect(self, reconnect=True):
         """
         Connect to the controller and start processing responses.
         """
+        self._connection_started = True
         _LOGGER.info("Connecting to %s:%s", self._host, self._port)
         reader, writer = await asyncio.open_connection(self._host, self._port)
-        self._ioloop_future = ensure_future(self._ioloop(reader, writer))
-        rio_version = await self._send_cmd('VERSION')
-        if not is_fw_version_higher(rio_version, MINIMUM_API_SUPPORT):
-            raise UnsupportedRussoundVersion(f"Russound RIO API v{rio_version} is not supported. The minimum "
+        self._ioloop_future = ensure_future(self._ioloop(reader, writer, reconnect))
+        self.rio_version = await self._send_cmd('VERSION')
+        if not is_fw_version_higher(self.rio_version, MINIMUM_API_SUPPORT):
+            raise UnsupportedRussoundVersion(f"Russound RIO API v{self.rio_version} is not supported. The minimum "
                                              f"supported version is v{MINIMUM_API_SUPPORT}")
-        self.rio_version = rio_version
         _LOGGER.info(f"Connected (Russound RIO v{self.rio_version})")
+        await self._watch_cached_devices()
 
     async def close(self):
         """
         Disconnect from the controller.
         """
+        self._connection_started = False
         _LOGGER.info("Closing connection to %s:%s", self._host, self._port)
         self._ioloop_future.cancel()
         try:
@@ -366,6 +379,19 @@ class Russound:
                     flags.append(flag)
         return flags
 
+    async def _watch(self, device_str: str):
+        self._watched_devices[device_str] = True
+        return await self._send_cmd(f"WATCH {device_str} ON")
+
+    async def _unwatch(self, device_str: str):
+        del self._watched_devices[device_str]
+        return await self._send_cmd(f"WATCH {device_str} OFF")
+
+    async def _watch_cached_devices(self):
+        _LOGGER.debug("Watching cached devices")
+        for device in self._watched_devices.keys():
+            await self._watch(device)
+
 
 class Controller:
     """Uniquely identifies a controller"""
@@ -447,12 +473,11 @@ class Zone:
         Zones on the watchlist will push all
         state changes (and those of the source they are currently connected to)
         back to the client"""
-        r = await self.instance._send_cmd(f"WATCH {self.device_str()} ON")
-        return r
+        return await self.instance._watch(self.device_str())
 
     async def unwatch(self):
         """Remove a zone from the watchlist."""
-        return await self.instance._send_cmd(f"WATCH {self.device_str()} OFF")
+        return await self.instance._unwatch(self.device_str())
 
     async def send_event(self, event_name, *args):
         """Send an event to a zone."""
