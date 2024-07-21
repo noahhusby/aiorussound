@@ -38,6 +38,7 @@ class Russound:
         self._controller_state = {}
         self._zone_callbacks = []
         self._source_callbacks = []
+        self._connection_started = False
         self.rio_version = None
 
     def _retrieve_cached_zone_variable(self, controller_id, zone_id, name):
@@ -114,7 +115,7 @@ class Russound:
 
         return ty, p["value"]
 
-    async def _ioloop(self, reader, writer):
+    async def _ioloop(self, reader, writer, reconnect):
         queue_future = ensure_future(self._cmd_queue.get())
         net_future = ensure_future(reader.readline())
         try:
@@ -158,9 +159,18 @@ class Russound:
             queue_future.cancel()
             net_future.cancel()
             raise
+        except asyncio.TimeoutError:
+            _LOGGER.warning("Connection to Russound client timed out")
+        except ConnectionResetError:
+            _LOGGER.warning("Connection to Russound client reset")
         except Exception:
             _LOGGER.exception("Unhandled exception in IO loop")
             raise
+        finally:
+            if reconnect and self._connection_started:
+                _LOGGER.info("Retrying connection to Russound client in 5s")
+                await asyncio.sleep(5.0)
+                await self.connect(reconnect)
 
     async def _send_cmd(self, cmd):
         future = asyncio.Future()
@@ -196,13 +206,14 @@ class Russound:
         """
         self._source_callbacks.remove(callback)
 
-    async def connect(self):
+    async def connect(self, reconnect=True):
         """
         Connect to the controller and start processing responses.
         """
+        self._connection_started = True
         _LOGGER.info("Connecting to %s:%s", self._host, self._port)
         reader, writer = await asyncio.open_connection(self._host, self._port)
-        self._ioloop_future = ensure_future(self._ioloop(reader, writer))
+        self._ioloop_future = ensure_future(self._ioloop(reader, writer, reconnect))
         rio_version = await self._send_cmd('VERSION')
         if not is_fw_version_higher(rio_version, MINIMUM_API_SUPPORT):
             raise UnsupportedRussoundVersion(f"Russound RIO API v{rio_version} is not supported. The minimum "
@@ -214,6 +225,7 @@ class Russound:
         """
         Disconnect from the controller.
         """
+        self._connection_started = False
         _LOGGER.info("Closing connection to %s:%s", self._host, self._port)
         self._ioloop_future.cancel()
         try:
