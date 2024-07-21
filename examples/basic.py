@@ -6,6 +6,8 @@ import logging
 import sys
 import os
 
+from aiorussound.const import FeatureFlag
+
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), '..'))
 
 from aiorussound import Russound  # noqa: E402
@@ -14,6 +16,9 @@ from aiorussound import Russound  # noqa: E402
 async def demo(loop, host):
     rus = Russound(loop, host)
     await rus.connect()
+    print("Supported Features:")
+    for flag in rus.supported_features:
+        print(flag)
     print("Finding controllers")
     controllers = await rus.enumerate_controllers()
 

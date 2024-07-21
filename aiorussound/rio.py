@@ -2,6 +2,10 @@ import asyncio
 import re
 import logging
 
+from aiorussound.const import FeatureFlag, MINIMUM_API_SUPPORT, FLAGS_BY_VERSION
+from aiorussound.exceptions import UncachedVariable, CommandException, UnsupportedRussoundVersion
+from aiorussound.util import is_feature_supported, is_fw_version_higher
+
 # Maintain compat with various 3.x async changes
 if hasattr(asyncio, "ensure_future"):
     ensure_future = asyncio.ensure_future
@@ -14,23 +18,6 @@ _re_response = re.compile(
     r"(?:(?:C\[(?P<controller>\d+)](?:\.Z\[(?P<zone>\d+)])?|C\[(?P<controller_alt>\d+)]\.S\[(?P<source>\d+)])?\.("
     r"?P<variable>\S+)|(?P<variable_no_prefix>\S+))=\s*\"(?P<value>.*)\""
 )
-
-
-class CommandException(Exception):
-    """A command sent to the controller caused an error."""
-
-    pass
-
-
-class UncachedVariable(Exception):
-    """A variable was not found in the cache."""
-
-    pass
-
-
-class UnsupportedFeature(Exception):
-    """A requested command is not supported on this controller"""
-    pass
 
 
 class Russound:
@@ -51,6 +38,7 @@ class Russound:
         self._controller_state = {}
         self._zone_callbacks = []
         self._source_callbacks = []
+        self.rio_version = None
 
     def _retrieve_cached_zone_variable(self, controller_id, zone_id, name):
         """
@@ -163,15 +151,15 @@ class Russound:
                         except CommandException as e:
                             future.set_exception(e)
                             break
-            logger.debug("IO loop exited")
+            _LOGGER.debug("IO loop exited")
         except asyncio.CancelledError:
-            logger.debug("IO loop cancelled")
+            _LOGGER.debug("IO loop cancelled")
             writer.close()
             queue_future.cancel()
             net_future.cancel()
             raise
         except Exception:
-            logger.exception("Unhandled exception in IO loop")
+            _LOGGER.exception("Unhandled exception in IO loop")
             raise
 
     async def _send_cmd(self, cmd):
@@ -215,7 +203,12 @@ class Russound:
         _LOGGER.info("Connecting to %s:%s", self._host, self._port)
         reader, writer = await asyncio.open_connection(self._host, self._port)
         self._ioloop_future = ensure_future(self._ioloop(reader, writer))
-        _LOGGER.info("Connected")
+        rio_version = await self._send_cmd('VERSION')
+        if not is_fw_version_higher(rio_version, MINIMUM_API_SUPPORT):
+            raise UnsupportedRussoundVersion(f"Russound RIO API v{rio_version} is not supported. The minimum "
+                                             f"supported version is v{MINIMUM_API_SUPPORT}")
+        self.rio_version = rio_version
+        _LOGGER.info(f"Connected (Russound RIO v{self.rio_version})")
 
     async def close(self):
         """
@@ -264,15 +257,17 @@ class Russound:
                 )
                 if not mac_address:
                     continue
-                controller_type = await self.get_controller_variable(
-                    controller_id, "type"
-                )
-                # firmware_version = await self.get_controller_variable(
-                #     controller_id, "firmwareVersion"
-                # )
+                controller_type = None
+                if is_feature_supported(self.rio_version, FeatureFlag.PROPERTY_CTRL_TYPE):
+                    controller_type = await self.get_controller_variable(
+                        controller_id, "type"
+                    )
                 firmware_version = None
-                if controller_type:
-                    controllers.append(Controller(self, controller_id, mac_address, controller_type, firmware_version))
+                if is_feature_supported(self.rio_version, FeatureFlag.PROPERTY_FIRMWARE_VERSION):
+                    firmware_version = await self.get_controller_variable(
+                        controller_id, "firmwareVersion"
+                    )
+                controllers.append(Controller(self, controller_id, mac_address, controller_type, firmware_version))
             except CommandException:
                 continue
 
@@ -363,8 +358,13 @@ class Russound:
         _LOGGER.debug("Controller Cache store C[%d].%s = %s", controller_id, name, value)
 
     @property
-    def api_version(self):
-        return self._send_cmd("VERSION")
+    def supported_features(self):
+        flags: list[FeatureFlag] = []
+        for key in FLAGS_BY_VERSION.keys():
+            if is_fw_version_higher(self.rio_version, key):
+                for flag in FLAGS_BY_VERSION[key]:
+                    flags.append(flag)
+        return flags
 
 
 class Controller:
@@ -397,12 +397,11 @@ class Controller:
         """Return a list of (zone_id, zone_name) tuples"""
         zones = []
         for zone_id in range(1, self.max_zones):
-            zone = Zone(self.instance, self, zone_id, "")
             try:
                 #
                 name = await self.instance.get_zone_variable(self.controller_id, zone_id, "name")
                 if name:
-                    zones.append((zone_id, zone))
+                    zones.append((zone_id, Zone(self.instance, self, zone_id, name)))
             except CommandException:
                 break
         return zones
