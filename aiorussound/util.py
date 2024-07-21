@@ -1,14 +1,18 @@
 import re
 
-from aiorussound.const import FeatureFlag
-from aiorussound.rio import UnsupportedFeature
+from aiorussound.const import FeatureFlag, VERSIONS_BY_FLAGS
+from aiorussound.exceptions import UnsupportedFeature
 
 _fw_pattern = re.compile(r"^(?P<major>\d{1,2})\.(?P<minor>\d{2})\.(?P<patch>\d{2})$")
 
 
-def check_feature_flag(firmware_ver: str, flag: FeatureFlag) -> None:
-    if not is_fw_version_higher(firmware_ver, flag.value):
-        raise UnsupportedFeature(f"Russound feature {flag} not supported in firmware {firmware_ver}")
+def raise_unsupported_feature(api_ver: str, flag: FeatureFlag) -> None:
+    if not is_feature_supported(api_ver, flag):
+        raise UnsupportedFeature(f"Russound feature {flag} not supported in api v{api_ver}")
+
+
+def is_feature_supported(api_ver: str, flag: FeatureFlag) -> bool:
+    return is_fw_version_higher(api_ver, VERSIONS_BY_FLAGS[flag])
 
 
 def is_fw_version_higher(fw_a: str, fw_b: str) -> bool:
@@ -28,4 +32,4 @@ def is_fw_version_higher(fw_a: str, fw_b: str) -> bool:
     b_patch = int(b_match.group('patch'))
 
     return (a_major > b_major) or (a_major == b_major and a_minor > b_minor) or (
-                a_major == b_major and a_minor == b_minor and a_patch >= b_patch)
+            a_major == b_major and a_minor == b_minor and a_patch >= b_patch)
