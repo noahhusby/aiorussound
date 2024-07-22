@@ -1,7 +1,9 @@
+from .exceptions import UnsupportedFeature, CommandException, UnsupportedRussoundVersion, UncachedVariable
 from .rio import (
-    CommandException,
-    UncachedVariable,
     Russound,
-    Controller)
+    Controller,
+    Zone,
+    Source)
 
-__all__ = ["CommandException", "UncachedVariable", "Russound", "Controller"]
+__all__ = ["CommandException", "UnsupportedFeature", "UnsupportedRussoundVersion", "UncachedVariable", "Russound",
+           "Controller", "Zone", "Source"]
