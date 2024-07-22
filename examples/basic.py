@@ -5,40 +5,37 @@ import logging
 # is used for tests.
 import sys
 import os
+
+from aiorussound.const import FeatureFlag
+
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), '..'))
 
-from aiorussound import Russound, ZoneID  # noqa: E402
+from aiorussound import Russound  # noqa: E402
+
 
 async def demo(loop, host):
     rus = Russound(loop, host)
     await rus.connect()
-
+    print("Supported Features:")
+    for flag in rus.supported_features:
+        print(flag)
     print("Finding controllers")
     controllers = await rus.enumerate_controllers()
 
-    for controller_id, mac_address, controller_type in controllers:
-        print("%s (%s): %s" % (controller_id, mac_address, controller_type))
+    for c in controllers:
+        print("%s (%s): %s" % (c.controller_id, c.mac_address, c.controller_type))
 
-    print("Determining valid zones")
-    # Determine Zones
-    valid_zones = await rus.enumerate_zones()
+        print("Determining valid zones")
+        # Determine Zones
 
-    for zone_id, name in valid_zones:
-        print("%s: %s" % (zone_id, name))
+        for zone_id, zone in c.zones.items():
+            await zone.watch()
+            print("%s: %s" % (zone_id, zone.name))
 
-    sources = await rus.enumerate_sources()
-    for source_id, name in sources:
-        print("%s: %s" % (source_id, name))
+        for source_id, source in c.sources.items():
+            await source.watch()
+            print("%s: %s" % (source_id, source.name))
 
-    await rus.watch_zone(ZoneID(1))
-    await asyncio.sleep(1)
-    await rus.send_zone_event(ZoneID(1), "KeyPress", "Volume", 40)
-    await asyncio.sleep(1)
-    r = await rus.get_zone_variable(ZoneID(1), "volume")
-    print("Volume:", r)
-    source = rus.get_cached_zone_variable(ZoneID(1), "currentsource")
-    name = await rus.get_source_variable(source, 'name')
-    print("Zone 1 source name: %s" % name)
     await rus.close()
     print("Done")
 
