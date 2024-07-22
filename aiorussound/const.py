@@ -158,7 +158,3 @@ VERSIONS_BY_FLAGS = defaultdict(list)
 for version, flags in FLAGS_BY_VERSION.items():
     for flag in flags:
         VERSIONS_BY_FLAGS[flag] = version
-
-# Each controller is separated to support future differences in features
-with open('aiorussound/devices.json') as json_file:
-    CONTROLLER_ATTR = json.load(json_file)
