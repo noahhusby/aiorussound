@@ -10,7 +10,7 @@ from aiorussound.const import FeatureFlag
 
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), '..'))
 
-from aiorussound import Russound  # noqa: E402
+from aiorussound import Russound, Controller, Zone  # noqa: E402
 
 
 async def demo(loop, host):
@@ -35,6 +35,11 @@ async def demo(loop, host):
         for source_id, source in c.sources.items():
             await source.watch()
             print("%s: %s" % (source_id, source.name))
+
+        for i in range (5):
+            con: Zone = c.zones.get(1)
+            await con.volume_up()
+            await asyncio.sleep(1.0)
 
     await rus.close()
     print("Done")
