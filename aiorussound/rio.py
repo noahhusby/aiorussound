@@ -417,7 +417,7 @@ class Zone:
 
     @property
     def volume(self):
-        return self._get('volume')
+        return self._get('volume', '0')
 
     @property
     def bass(self):
@@ -449,7 +449,7 @@ class Zone:
 
     @property
     def status(self):
-        return self._get('status')
+        return self._get('status', 'OFF')
 
     @property
     def mute(self):
