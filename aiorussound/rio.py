@@ -397,7 +397,10 @@ class Zone:
     @property
     def current_source(self):
         # Default to one if not available at the present time
-        current_source = int(self._get('currentSource', 1))
+        return self._get('currentSource', '1')
+
+    def fetch_current_source(self):
+        current_source = int(self.current_source)
         return self.controller.sources[current_source]
 
     @property
