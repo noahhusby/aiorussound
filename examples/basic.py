@@ -22,7 +22,7 @@ async def demo(loop, host):
     print("Finding controllers")
     controllers = await rus.enumerate_controllers()
 
-    for c in controllers:
+    for c in controllers.values():
         print("%s (%s): %s" % (c.controller_id, c.mac_address, c.controller_type))
 
         print("Determining valid zones")

@@ -237,7 +237,8 @@ class Russound:
                     firmware_version = await self.get_variable(
                         device_str, "firmwareVersion"
                     )
-                controller = Controller(self, controller_id, mac_address, controller_type, firmware_version)
+                controller = Controller(self, controllers.get(1, None), controller_id, mac_address, controller_type,
+                                        firmware_version)
                 await controller.fetch_configuration()
                 controllers[controller_id] = controller
             except CommandException:
@@ -271,9 +272,10 @@ class Russound:
 class Controller:
     """Uniquely identifies a controller"""
 
-    def __init__(self, instance: Russound, controller_id: int, mac_address: str, controller_type: str,
-                 firmware_version: str):
+    def __init__(self, instance: Russound, parent_controller, controller_id: int, mac_address: str,
+                 controller_type: str, firmware_version: str):
         self.instance = instance
+        self.parent_controller = parent_controller
         self.controller_id = controller_id
         self.mac_address = mac_address
         self.controller_type = controller_type
