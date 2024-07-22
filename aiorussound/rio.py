@@ -454,7 +454,7 @@ class Zone:
         return self._get('status', 'OFF')
 
     @property
-    def mute(self):
+    def is_mute(self):
         return self._get('mute')
 
     @property
@@ -480,6 +480,30 @@ class Zone:
     @property
     def enabled(self):
         return self._get('enabled')
+
+    async def mute(self):
+        return await self.send_event('ZoneMuteOn')
+
+    async def unmute(self):
+        return await self.send_event('ZoneMuteOff')
+
+    async def set_volume(self, volume):
+        return await self.send_event('KeyPress', 'Volume', volume)
+
+    async def volume_up(self):
+        return await self.send_event('KeyPress', 'VolumeUp')
+
+    async def volume_down(self):
+        return await self.send_event('KeyPress', 'VolumeDown')
+
+    async def zone_on(self):
+        return await self.send_event('ZoneOn')
+
+    async def zone_off(self):
+        return await self.send_event('ZoneOff')
+
+    async def select_source(self, source: int):
+        return await self.send_event('SelectSource', source)
 
 
 class Source:
