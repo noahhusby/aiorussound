@@ -35,9 +35,13 @@ def is_fw_version_higher(fw_a: str, fw_b: str) -> bool:
             a_major == b_major and a_minor == b_minor and a_patch >= b_patch)
 
 
-def form_zone_device_str(controller_id: int, zone_id: int) -> str:
+def controller_device_str(controller_id: int) -> str:
+    return f"C[{controller_id}]"
+
+
+def zone_device_str(controller_id: int, zone_id: int) -> str:
     return f"C[{controller_id}].Z[{zone_id}]"
 
 
-def form_source_device_str(controller_id: int, source_id: int) -> str:
-    return f"C[{controller_id}].S[{source_id}]"
+def source_device_str(source_id: int) -> str:
+    return f"S[{source_id}]"
