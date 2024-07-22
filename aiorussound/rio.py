@@ -391,12 +391,13 @@ class Zone:
         )
         return await self.instance._send_cmd(cmd)
 
-    def _get(self, variable):
-        return self.instance.get_cached_variable(self.device_str(), variable)
+    def _get(self, variable, default=None):
+        return self.instance.get_cached_variable(self.device_str(), variable, default)
 
     @property
     def current_source(self):
-        current_source = int(self._get('currentSource'))
+        # Default to one if not available at the present time
+        current_source = int(self._get('currentSource', 1))
         return self.controller.sources[current_source]
 
     @property
