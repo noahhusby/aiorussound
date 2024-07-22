@@ -323,6 +323,12 @@ class Controller:
             except CommandException:
                 break
 
+    def add_callback(self, callback):
+        self.instance._add_callback(controller_device_str(self.controller_id), callback)
+
+    def remove_callback(self, callback):
+        self.instance._remove_callback(callback)
+
 
 class Zone:
     """Uniquely identifies a zone
@@ -369,6 +375,12 @@ class Zone:
     async def unwatch(self):
         """Remove a zone from the watchlist."""
         return await self.instance._unwatch(self.device_str())
+
+    def add_callback(self, callback):
+        self.instance._add_callback(self.device_str(), callback)
+
+    def remove_callback(self, callback):
+        self.instance._remove_callback(callback)
 
     async def send_event(self, event_name, *args):
         """Send an event to a zone."""
@@ -481,6 +493,12 @@ class Source:
         command
         """
         return source_device_str(self.source_id)
+
+    def add_callback(self, callback):
+        self.instance._add_callback(self.device_str(), callback)
+
+    def remove_callback(self, callback):
+        self.instance._remove_callback(callback)
 
     async def watch(self):
         """Add a source to the watchlist.
