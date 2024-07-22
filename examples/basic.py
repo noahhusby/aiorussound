@@ -31,24 +31,13 @@ async def demo(loop, host):
 
         for zone_id, zone in valid_zones:
             await zone.watch()
-            print("%s: %s" % (zone_id, await zone.volume))
+            print("%s: %s" % (zone_id, zone.name))
 
-        sources = await rus.enumerate_sources()
-        for source_id, name in sources:
-            print("%s: %s" % (source_id, name))
+        sources = await c.enumerate_sources()
+        for source_id, source in sources:
+            await source.watch()
+            print("%s: %s" % (source_id, source.name))
 
-        # await rus.watch_zone(ZoneID(1))
-        # await asyncio.sleep(1)
-        # await rus.send_zone_event(ZoneID(1), "KeyPress", "Volume", 40)
-        # await asyncio.sleep(1)
-        # r = await rus.get_zone_variable(ZoneID(1), "volume")
-        # print("Volume:", r)
-        # source = rus.get_cached_zone_variable(ZoneID(1), "currentsource")
-        # name = await rus.get_source_variable(source, 'name')
-        # print("Zone 1 source name: %s" % name)
-        await asyncio.sleep(5.0)
-        for zone_id, zone in valid_zones:
-            print("%s: %s" % (zone_id, await zone.volume))
     await rus.close()
     print("Done")
 
