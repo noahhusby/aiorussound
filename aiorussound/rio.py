@@ -217,7 +217,7 @@ class Russound:
 
     async def enumerate_controllers(self):
         """Return a list of (controller_id, controller_macAddress, controller_type) tuples"""
-        controllers: list[Controller] = []
+        controllers: dict[int, Controller] = {}
         # Search for first controller, then iterate if RNET is supported
         for controller_id in range(1, 8):
             device_str = controller_device_str(controller_id)
@@ -239,7 +239,7 @@ class Russound:
                     )
                 controller = Controller(self, controller_id, mac_address, controller_type, firmware_version)
                 await controller.fetch_configuration()
-                controllers.append(controller)
+                controllers[controller_id] = controller
             except CommandException:
                 continue
 
