@@ -3,7 +3,7 @@ import logging
 from asyncio import StreamWriter, StreamReader, AbstractEventLoop
 
 from aiorussound.const import FeatureFlag, MINIMUM_API_SUPPORT, FLAGS_BY_VERSION, RESPONSE_REGEX, DEFAULT_PORT, \
-    RECONNECT_DELAY
+    RECONNECT_DELAY, ZONE_PROPERTIES, SOURCE_PROPERTIES
 from aiorussound.exceptions import UncachedVariable, CommandException, UnsupportedRussoundVersion
 from aiorussound.util import is_feature_supported, is_fw_version_higher, zone_device_str, source_device_str, \
     controller_device_str
@@ -284,8 +284,8 @@ class Controller:
         # TODO: Metadata fetching
 
     async def fetch_configuration(self):
-        await self._init_zones()
         await self._init_sources()
+        await self._init_zones()
 
     def __str__(self):
         return f"{self.controller_id}"
@@ -307,7 +307,10 @@ class Controller:
                 device_str = zone_device_str(self.controller_id, zone_id)
                 name = await self.instance.get_variable(device_str, "name")
                 if name:
-                    self.zones[zone_id] = Zone(self.instance, self, zone_id, name)
+                    zone = Zone(self.instance, self, zone_id, name)
+                    await zone.fetch_configuration()
+                    self.zones[zone_id] = zone
+
             except CommandException:
                 break
 
@@ -319,7 +322,9 @@ class Controller:
                 device_str = source_device_str(source_id)
                 name = await self.instance.get_variable(device_str, "name")
                 if name:
-                    self.sources[source_id] = Source(self.instance, self, source_id, name)
+                    source = Source(self.instance, self, source_id, name)
+                    await source.fetch_configuration()
+                    self.sources[source_id] = source
             except CommandException:
                 break
 
@@ -343,6 +348,13 @@ class Zone:
         self.controller = controller
         self.zone_id = int(zone_id)
         self.name = name
+
+    async def fetch_configuration(self):
+        for prop in ZONE_PROPERTIES:
+            try:
+                await self.instance.get_variable(self.device_str(), prop)
+            except CommandException:
+                continue
 
     def __str__(self):
         return f"{self.controller.mac_address} > Z{self.zone_id}"
@@ -476,6 +488,13 @@ class Source:
         self.controller = controller
         self.source_id = int(source_id)
         self.name = name
+
+    async def fetch_configuration(self):
+        for prop in SOURCE_PROPERTIES:
+            try:
+                await self.instance.get_variable(self.device_str(), prop)
+            except CommandException:
+                continue
 
     def __str__(self):
         return f"{self.controller.mac_address} > S{self.source_id}"

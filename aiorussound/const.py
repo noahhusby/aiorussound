@@ -155,6 +155,17 @@ FLAGS_BY_VERSION = {
 
 VERSIONS_BY_FLAGS = defaultdict(list)
 
+ZONE_PROPERTIES = [
+    'volume', 'bass', 'treble', 'balance', 'loudness', 'turnOnVolume', 'doNotDisturb', 'partyMode', 'status', 'mute',
+    'sharedSource', 'lastError', 'page', 'sleepTimeDefault', 'sleepTimeRemaining', 'enabled'
+]
+
+SOURCE_PROPERTIES = [
+    'type', 'channel', 'coverArtURL', 'channelName', 'genre', 'artistName', 'albumName', 'playlistName', 'songName',
+    'programServiceName', 'radioText', 'shuffleMode', 'repeatMode', 'mode', 'playStatus', 'sampleRate', 'bitRate',
+    'bitDepth', 'playTime', 'trackTime'
+]
+
 for version, flags in FLAGS_BY_VERSION.items():
     for flag in flags:
         VERSIONS_BY_FLAGS[flag] = version
