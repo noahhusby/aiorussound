@@ -500,69 +500,81 @@ class Source:
         return self.instance.get_cached_variable(self.device_str(), variable)
 
     @property
-    def current_source(self):
-        return self._get('currentSource')
+    def type(self):
+        return self._get('type')
 
     @property
-    def volume(self):
-        return self._get('volume')
+    def channel(self):
+        return self._get('channel')
 
     @property
-    def bass(self):
-        return self._get('bass')
+    def cover_art_url(self):
+        return self._get('coverArtURL')
 
     @property
-    def treble(self):
-        return self._get('treble')
+    def channel_name(self):
+        return self._get('channelName')
 
     @property
-    def balance(self):
-        return self._get('balance')
+    def genre(self):
+        return self._get('genre')
 
     @property
-    def loudness(self):
-        return self._get('loudness')
+    def artist_name(self):
+        return self._get('artistName')
 
     @property
-    def turn_on_volume(self):
-        return self._get('turnOnVolume')
+    def album_name(self):
+        return self._get('albumName')
 
     @property
-    def do_not_disturb(self):
-        return self._get('doNotDisturb')
+    def playlist_name(self):
+        return self._get('playlistName')
 
     @property
-    def party_mode(self):
-        return self._get('partyMode')
+    def song_name(self):
+        return self._get('songName')
 
     @property
-    def status(self):
-        return self._get('status')
+    def program_service_name(self):
+        return self._get('programServiceName')
 
     @property
-    def mute(self):
-        return self._get('mute')
+    def radio_text(self):
+        return self._get('radioText')
 
     @property
-    def shared_source(self):
-        return self._get('sharedSource')
+    def shuffle_mode(self):
+        return self._get('shuffleMode')
 
     @property
-    def last_error(self):
-        return self._get('lastError')
+    def repeat_mode(self):
+        return self._get('repeatMode')
 
     @property
-    def page(self):
-        return self._get('page')
+    def mode(self):
+        return self._get('mode')
 
     @property
-    def sleep_time_default(self):
-        return self._get('sleepTimeDefault')
+    def play_status(self):
+        return self._get('playStatus')
 
     @property
-    def sleep_time_remaining(self):
-        return self._get('sleepTimeRemaining')
+    def sample_rate(self):
+        return self._get('sampleRate')
 
     @property
-    def enabled(self):
-        return self._get('enabled')
+    def bit_rate(self):
+        return self._get('bitRate')
+
+    @property
+    def bit_depth(self):
+        return self._get('bitDepth')
+
+    @property
+    def play_time(self):
+        return self._get('playTime')
+
+    @property
+    def track_time(self):
+        return self._get('trackTime')
