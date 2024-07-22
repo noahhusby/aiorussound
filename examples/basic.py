@@ -27,14 +27,12 @@ async def demo(loop, host):
 
         print("Determining valid zones")
         # Determine Zones
-        valid_zones = await c.enumerate_zones()
 
-        for zone_id, zone in valid_zones:
+        for zone_id, zone in c.zones.items():
             await zone.watch()
             print("%s: %s" % (zone_id, zone.name))
 
-        sources = await c.enumerate_sources()
-        for source_id, source in sources:
+        for source_id, source in c.sources.items():
             await source.watch()
             print("%s: %s" % (source_id, source.name))
 

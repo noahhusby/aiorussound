@@ -237,7 +237,9 @@ class Russound:
                     firmware_version = await self.get_variable(
                         device_str, "firmwareVersion"
                     )
-                controllers.append(Controller(self, controller_id, mac_address, controller_type, firmware_version))
+                controller = Controller(self, controller_id, mac_address, controller_type, firmware_version)
+                await controller.fetch_configuration()
+                controllers.append(controller)
             except CommandException:
                 continue
 
@@ -277,8 +279,13 @@ class Controller:
         self.controller_type = controller_type
         self.firmware_version = firmware_version
         self.zones = {}
+        self.sources = {}
         self.max_zones = 8
         # TODO: Metadata fetching
+
+    async def fetch_configuration(self):
+        await self._init_zones()
+        await self._init_sources()
 
     def __str__(self):
         return f"{self.controller_id}"
@@ -292,31 +299,29 @@ class Controller:
     def __hash__(self):
         return hash(str(self))
 
-    async def enumerate_zones(self):
+    async def _init_zones(self):
         """Return a list of (zone_id, zone) tuples"""
-        zones = []
+        self.zones = {}
         for zone_id in range(1, self.max_zones):
             try:
                 device_str = zone_device_str(self.controller_id, zone_id)
                 name = await self.instance.get_variable(device_str, "name")
                 if name:
-                    zones.append((zone_id, Zone(self.instance, self, zone_id, name)))
+                    self.zones[zone_id] = Zone(self.instance, self, zone_id, name)
             except CommandException:
                 break
-        return zones
 
-    async def enumerate_sources(self):
-        """Return a list of (source_id, source) tuples"""
-        sources = []
+    async def _init_sources(self):
+        """Return a list of (zone_id, zone) tuples"""
+        self.sources = {}
         for source_id in range(1, 17):
             try:
                 device_str = source_device_str(source_id)
                 name = await self.instance.get_variable(device_str, "name")
                 if name:
-                    sources.append((source_id, Source(self.instance, self, source_id, name)))
+                    self.sources[source_id] = Source(self.instance, self, source_id, name)
             except CommandException:
                 break
-        return sources
 
 
 class Zone:
@@ -379,7 +384,8 @@ class Zone:
 
     @property
     def current_source(self):
-        return self._get('currentSource')
+        current_source = int(self._get('currentSource'))
+        return self.controller.sources[current_source]
 
     @property
     def volume(self):
