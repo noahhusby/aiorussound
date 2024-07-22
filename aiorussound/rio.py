@@ -520,7 +520,7 @@ class Source:
         )
         return await self.instance._send_cmd(cmd)
 
-    async def _get(self, variable):
+    def _get(self, variable):
         return self.instance.get_cached_variable(self.device_str(), variable)
 
     @property
