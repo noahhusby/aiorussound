@@ -41,8 +41,8 @@ async def demo(loop, host):
             await con.volume_up()
             await asyncio.sleep(1.0)
 
-    await rus.close()
-    print("Done")
+    while True:
+        await asyncio.sleep(1)
 
 
 logging.basicConfig(level=logging.DEBUG)

@@ -86,9 +86,17 @@ class Russound:
 
         return ty, p["value"] or p["value_only"]
 
+    async def _keep_alive(self):
+        while True:
+            await asyncio.sleep(900)  # 15 minutes
+            _LOGGER.debug("Sending keep alive to device")
+            await self._send_cmd("VERSION")
+
     async def _ioloop(self, reader: StreamReader, writer: StreamWriter, reconnect: bool):
         queue_future = ensure_future(self._cmd_queue.get())
         net_future = ensure_future(reader.readline())
+        keep_alive_task = asyncio.create_task(self._keep_alive())
+
         try:
             _LOGGER.debug("Starting IO loop")
             while True:
@@ -125,9 +133,6 @@ class Russound:
                             break
         except asyncio.CancelledError:
             _LOGGER.debug("IO loop cancelled")
-            writer.close()
-            queue_future.cancel()
-            net_future.cancel()
             raise
         except asyncio.TimeoutError:
             _LOGGER.warning("Connection to Russound client timed out")
@@ -137,12 +142,18 @@ class Russound:
             _LOGGER.exception("Unhandled exception in IO loop")
             raise
         finally:
+            _LOGGER.debug("Cancelling all tasks...")
+            writer.close()
+            queue_future.cancel()
+            net_future.cancel()
+            keep_alive_task.cancel()
             if reconnect and self._connection_started:
                 _LOGGER.info("Retrying connection to Russound client in 5s")
                 await asyncio.sleep(RECONNECT_DELAY)
                 await self.connect(reconnect)
 
     async def _send_cmd(self, cmd: str):
+        _LOGGER.debug(f"Sending command '{cmd}' to Russound client")
         future = asyncio.Future()
         await self._cmd_queue.put((cmd, future))
         r = await future

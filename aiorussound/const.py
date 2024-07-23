@@ -11,6 +11,7 @@ MINIMUM_API_SUPPORT = "1.02.00"
 DEFAULT_PORT = 9621
 
 RECONNECT_DELAY = 5.0
+TIMEOUT = 5.0
 
 RESPONSE_REGEX = re.compile(
     r"^(?:C\[(?P<controller>\d+)](?:\.Z\[(?P<zone>\d+)])?|S\[(?P<source>\d+)])?\.(?P<variable>\S+)=\s*\"("
