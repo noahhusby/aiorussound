@@ -19,7 +19,6 @@ RESPONSE_REGEX = re.compile(
 )
 
 
-# TODO: Add features 1.06.00 and up
 class FeatureFlag(Enum):
     SUPPORT_POWER_MGMT = 1
     SUPPORT_ZONE_PARAMETERS = 2

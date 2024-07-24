@@ -36,7 +36,7 @@ async def demo(loop, host):
             await source.watch()
             print("%s: %s" % (source_id, source.name))
 
-        for i in range (5):
+        for _ in range(5):
             con: Zone = c.zones.get(1)
             await con.volume_up()
             await asyncio.sleep(1.0)
