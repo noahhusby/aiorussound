@@ -34,6 +34,7 @@ class Russound:
         self._callbacks = {}
         self._connection_started = False
         self._watched_devices = {}
+        self._controllers = {}
         self.rio_version = None
 
     def _retrieve_cached_variable(self, device_str: str, key: str):
@@ -63,6 +64,14 @@ class Russound:
         # Handle callbacks
         for callback in self._callbacks.get(device_str, []):
             callback(device_str, key, value)
+        # Handle source callback
+        if device_str[0] is 'S':
+            for controller in self._controllers.values():
+                for zone in controller.zones.values():
+                    source = zone.fetch_current_source()
+                    if source and source.device_str() is device_str:
+                        for callback in self._callbacks.get(zone.device_str(), []):
+                            callback(device_str, key, value)
 
     def _process_response(self, res: bytes):
         s = str(res, "utf-8").strip()
@@ -254,7 +263,7 @@ class Russound:
                 controllers[controller_id] = controller
             except CommandException:
                 continue
-
+        self._controllers = controllers
         return controllers
 
     @property
