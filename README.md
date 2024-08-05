@@ -43,6 +43,9 @@ The built-in ethernet port on the Russound device natively support the RIO proto
 
 The RS232 port must be configured to use the RIO protocol instead of the RNET protocol for the library to function properly. This can be configured using the SCS-C5 configuration tool or the controller's Web GUI.
 
+
+## Installation
+
 ## Acknowledgements
 This is the continuation of the `russound_rio` package. This wouldn't be possible without the excellent work from [@wickerwaka](https://github.com/wickerwaka) and [@chphilli](https://github.com/chphilli).
 
