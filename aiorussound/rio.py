@@ -239,7 +239,7 @@ class Russound:
         """Return a list of (controller_id, controller_macAddress, controller_type) tuples"""
         controllers: dict[int, Controller] = {}
         # Search for first controller, then iterate if RNET is supported
-        for controller_id in range(1, 8):
+        for controller_id in range(1, 9):
             device_str = controller_device_str(controller_id)
             try:
                 mac_address = await self.get_variable(
@@ -324,7 +324,7 @@ class Controller:
     async def _init_zones(self):
         """Return a list of (zone_id, zone) tuples"""
         self.zones = {}
-        for zone_id in range(1, self.max_zones):
+        for zone_id in range(1, self.max_zones + 1):
             try:
                 device_str = zone_device_str(self.controller_id, zone_id)
                 name = await self.instance.get_variable(device_str, "name")
