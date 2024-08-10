@@ -1,10 +1,6 @@
-import json
 import re
 from collections import defaultdict
 from enum import Enum
-
-MAX_ZONES_KEY = "max_zones"
-RNET_SUPPORT_KEY = "rnet_support"
 
 MINIMUM_API_SUPPORT = "1.02.00"
 
@@ -12,6 +8,8 @@ DEFAULT_PORT = 9621
 
 RECONNECT_DELAY = 5.0
 TIMEOUT = 5.0
+
+MAX_SOURCE = 17
 
 RESPONSE_REGEX = re.compile(
     r"^(?:C\[(?P<controller>\d+)](?:\.Z\[(?P<zone>\d+)])?|S\[(?P<source>\d+)])?\.(?P<variable>\S+)=\s*\"("

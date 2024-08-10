@@ -3,10 +3,10 @@ import logging
 from asyncio import StreamWriter, StreamReader, AbstractEventLoop
 
 from aiorussound.const import FeatureFlag, MINIMUM_API_SUPPORT, FLAGS_BY_VERSION, RESPONSE_REGEX, DEFAULT_PORT, \
-    RECONNECT_DELAY, ZONE_PROPERTIES, SOURCE_PROPERTIES
+    RECONNECT_DELAY, ZONE_PROPERTIES, SOURCE_PROPERTIES, MAX_SOURCE
 from aiorussound.exceptions import UncachedVariable, CommandException, UnsupportedRussoundVersion
 from aiorussound.util import is_feature_supported, is_fw_version_higher, zone_device_str, source_device_str, \
-    controller_device_str
+    controller_device_str, get_max_zones
 
 # Maintain compat with various 3.x async changes
 if hasattr(asyncio, "ensure_future"):
@@ -302,8 +302,7 @@ class Controller:
         self.firmware_version = firmware_version
         self.zones = {}
         self.sources = {}
-        self.max_zones = 8
-        # TODO: Metadata fetching
+        self.max_zones = get_max_zones(controller_type)
 
     async def fetch_configuration(self):
         await self._init_sources()
@@ -339,7 +338,7 @@ class Controller:
     async def _init_sources(self):
         """Return a list of (zone_id, zone) tuples"""
         self.sources = {}
-        for source_id in range(1, 17):
+        for source_id in range(1, MAX_SOURCE):
             try:
                 device_str = source_device_str(source_id)
                 name = await self.instance.get_variable(device_str, "name")

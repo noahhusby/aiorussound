@@ -45,3 +45,11 @@ def zone_device_str(controller_id: int, zone_id: int) -> str:
 
 def source_device_str(source_id: int) -> str:
     return f"S[{source_id}]"
+
+def get_max_zones(model: str) -> int:
+    if model is 'MCA-88' or 'MCA-88X' or 'MCA-C5':
+        return 8
+    elif model is 'MCA-66' or 'MCA-C3':
+        return 6
+    else:
+        return 1
