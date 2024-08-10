@@ -2,7 +2,7 @@ import re
 from collections import defaultdict
 from enum import Enum
 
-MINIMUM_API_SUPPORT = "1.02.00"
+MINIMUM_API_SUPPORT = "1.05.00"
 
 DEFAULT_PORT = 9621
 

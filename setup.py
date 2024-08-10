@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
         name='aiorussound',
-        version='2.2.2',
+        version='2.2.3',
         packages=['aiorussound'],
         license='MIT',
         author='Noah Husby',

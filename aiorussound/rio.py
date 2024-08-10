@@ -242,16 +242,18 @@ class Russound:
         for controller_id in range(1, 9):
             device_str = controller_device_str(controller_id)
             try:
-                mac_address = await self.get_variable(
-                    device_str, "macAddress"
+                controller_type = await self.get_variable(
+                    device_str, "type"
                 )
-                if not mac_address:
+                if not controller_type:
                     continue
-                controller_type = None
-                if is_feature_supported(self.rio_version, FeatureFlag.PROPERTY_CTRL_TYPE):
-                    controller_type = await self.get_variable(
-                        device_str, "type"
+                mac_address = None
+                try:
+                    mac_address = await self.get_variable(
+                        device_str, "macAddress"
                     )
+                except CommandException:
+                    pass
                 firmware_version = None
                 if is_feature_supported(self.rio_version, FeatureFlag.PROPERTY_FIRMWARE_VERSION):
                     firmware_version = await self.get_variable(
@@ -265,6 +267,7 @@ class Russound:
                 continue
         self._controllers = controllers
         return controllers
+
 
     @property
     def supported_features(self):
