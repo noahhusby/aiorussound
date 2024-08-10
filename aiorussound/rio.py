@@ -65,7 +65,7 @@ class Russound:
         for callback in self._callbacks.get(device_str, []):
             callback(device_str, key, value)
         # Handle source callback
-        if device_str[0] is 'S':
+        if device_str[0] == 'S':
             for controller in self._controllers.values():
                 for zone in controller.zones.values():
                     source = zone.fetch_current_source()
