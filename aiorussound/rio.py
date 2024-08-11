@@ -75,6 +75,8 @@ class Russound:
 
     def _process_response(self, res: bytes):
         s = str(res, "utf-8").strip()
+        if not s:
+            return None, None
         ty, payload = s[0], s[2:]
         if ty == "E":
             _LOGGER.debug("Device responded with error: %s", payload)
