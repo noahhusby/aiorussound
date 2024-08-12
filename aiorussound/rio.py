@@ -520,6 +520,21 @@ class Zone:
     async def volume_down(self):
         return await self.send_event('KeyPress', 'VolumeDown')
 
+    async def previous(self):
+        return await self.send_event('KeyPress', 'Previous')
+
+    async def next(self):
+        return await self.send_event('KeyPress', 'Next')
+
+    async def stop(self):
+        return await self.send_event('KeyPress', 'Stop')
+
+    async def pause(self):
+        return await self.send_event('KeyPress', 'Pause')
+
+    async def play(self):
+        return await self.send_event('KeyPress', 'Play')
+
     async def zone_on(self):
         return await self.send_event('ZoneOn')
 
