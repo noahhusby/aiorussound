@@ -69,7 +69,7 @@ class Russound:
             for controller in self._controllers.values():
                 for zone in controller.zones.values():
                     source = zone.fetch_current_source()
-                    if source and source.device_str() is device_str:
+                    if source and source.device_str() == device_str:
                         for callback in self._callbacks.get(zone.device_str(), []):
                             callback(device_str, key, value)
 

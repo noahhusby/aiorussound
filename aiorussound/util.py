@@ -48,9 +48,9 @@ def source_device_str(source_id: int) -> str:
 
 
 def get_max_zones(model: str) -> int:
-    if model is 'MCA-88' or 'MCA-88X' or 'MCA-C5':
+    if model in ('MCA-88', 'MCA-88X', 'MCA-C5'):
         return 8
-    elif model is 'MCA-66' or 'MCA-C3':
+    elif model in ('MCA-66', 'MCA-C3'):
         return 6
     else:
         return 1
