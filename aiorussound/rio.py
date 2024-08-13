@@ -36,6 +36,7 @@ class Russound:
         self._watched_devices = {}
         self._controllers = {}
         self.rio_version = None
+        self.connected = False
 
     def _retrieve_cached_variable(self, device_str: str, key: str):
         """
@@ -144,6 +145,7 @@ class Russound:
                             break
         except asyncio.CancelledError:
             _LOGGER.debug("IO loop cancelled")
+            self.connected = False
             raise
         except asyncio.TimeoutError:
             _LOGGER.warning("Connection to Russound client timed out")
@@ -151,6 +153,7 @@ class Russound:
             _LOGGER.warning("Connection to Russound client reset")
         except Exception:
             _LOGGER.exception("Unhandled exception in IO loop")
+            self.connected = False
             raise
         finally:
             _LOGGER.debug("Cancelling all tasks...")
@@ -158,6 +161,7 @@ class Russound:
             queue_future.cancel()
             net_future.cancel()
             keep_alive_task.cancel()
+            self.connected = False
             if reconnect and self._connection_started:
                 _LOGGER.info("Retrying connection to Russound client in 5s")
                 await asyncio.sleep(RECONNECT_DELAY)
@@ -200,6 +204,7 @@ class Russound:
                                              f"supported version is v{MINIMUM_API_SUPPORT}")
         _LOGGER.info(f"Connected (Russound RIO v{self.rio_version})")
         await self._watch_cached_devices()
+        self.connected = True
 
     async def close(self):
         """
@@ -212,6 +217,7 @@ class Russound:
             await self._ioloop_future
         except asyncio.CancelledError:
             pass
+        self.connected = False
 
     async def set_variable(self, device_str: str, key: str, value: str):
         """
