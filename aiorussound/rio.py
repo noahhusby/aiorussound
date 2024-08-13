@@ -32,6 +32,7 @@ class Russound:
         self._cmd_queue = asyncio.Queue()
         self._state = {}
         self._callbacks = {}
+        self._connection_callbacks = []
         self._connection_started = False
         self._watched_devices = {}
         self._controllers = {}
@@ -145,7 +146,7 @@ class Russound:
                             break
         except asyncio.CancelledError:
             _LOGGER.debug("IO loop cancelled")
-            self.connected = False
+            self._set_connected(False)
             raise
         except asyncio.TimeoutError:
             _LOGGER.warning("Connection to Russound client timed out")
@@ -153,7 +154,7 @@ class Russound:
             _LOGGER.warning("Connection to Russound client reset")
         except Exception:
             _LOGGER.exception("Unhandled exception in IO loop")
-            self.connected = False
+            self._set_connected(False)
             raise
         finally:
             _LOGGER.debug("Cancelling all tasks...")
@@ -161,7 +162,7 @@ class Russound:
             queue_future.cancel()
             net_future.cancel()
             keep_alive_task.cancel()
-            self.connected = False
+            self._set_connected(False)
             if reconnect and self._connection_started:
                 _LOGGER.info("Retrying connection to Russound client in 5s")
                 await asyncio.sleep(RECONNECT_DELAY)
@@ -190,6 +191,24 @@ class Russound:
         for callbacks in self._callbacks.values():
             callbacks.remove(callback)
 
+    def add_connection_callback(self, callback):
+        """
+        Registers a callback to be called whenever the instance is connected/disconnected.
+        The callback will be passed one argument: connected: bool.
+        """
+        self._connection_callbacks.append(callback)
+
+    def remove_connection_callback(self, callback):
+        """
+        Removes a previously registered callback.
+        """
+        self._connection_callbacks.remove(callback)
+
+    def _set_connected(self, connected: bool):
+        self.connected = connected
+        for callback in self._connection_callbacks:
+            callback(connected)
+
     async def connect(self, reconnect=True):
         """
         Connect to the controller and start processing responses.
@@ -204,7 +223,7 @@ class Russound:
                                              f"supported version is v{MINIMUM_API_SUPPORT}")
         _LOGGER.info(f"Connected (Russound RIO v{self.rio_version})")
         await self._watch_cached_devices()
-        self.connected = True
+        self._set_connected(True)
 
     async def close(self):
         """
@@ -217,7 +236,7 @@ class Russound:
             await self._ioloop_future
         except asyncio.CancelledError:
             pass
-        self.connected = False
+        self._set_connected(False)
 
     async def set_variable(self, device_str: str, key: str, value: str):
         """
