@@ -1,0 +1,63 @@
+[tool.poetry]
+name = "aiorussound"
+version = "2.3.2"
+description = "Asyncio client for Russound RIO devices."
+authors = ["Noah Husby <opensource@husbylabs.com>"]
+maintainers = ["Noah Husby <opensource@husbylabs.com>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/noahhusby/aiorussound"
+repository = "https://github.com/noahhusby/aiorussound"
+documentation = "https://github.com/noahhusby/aiorussound"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+[tool.poetry.group.dev.dependencies]
+codespell = "2.3.0"
+covdefaults = "2.3.0"
+coverage = {version = "7.6.1", extras = ["toml"]}
+mypy = "1.11.1"
+pre-commit = "3.8.0"
+pre-commit-hooks = "4.6.0"
+pylint = "3.2.6"
+pytest = "8.3.2"
+pytest-asyncio = "0.23.8"
+pytest-cov = "5.0.0"
+ruff = "0.5.7"
+safety = "3.2.5"
+yamllint = "1.35.1"
+syrupy = "4.6.1"
+aioresponses = "0.7.6"
+
+[tool.ruff.lint]
+ignore = [
+  "ANN101", # Self... explanatory
+  "ANN102", # cls... just as useless
+  "ANN401", # Opinioated warning on disallowing dynamically typed expressions
+  "COM812", # Conflicts with other rules
+  "D203", # Conflicts with other rules
+  "D213", # Conflicts with other rules
+  "D417", # False positives in some occasions
+  "ISC001", # Conflicts with other rules
+  "PLR2004", # Just annoying, not really useful
+]
+select = ["ALL"]
+
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = false
+mark-parentheses = false
+
+[tool.ruff.lint.isort]
+known-first-party = ["aiorussound"]
+force-sort-within-sections = true
+split-on-trailing-comma = false
+combine-as-imports = true
+
+[tool.ruff.lint.mccabe]
+max-complexity = 25
+
+
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0"]

@@ -1,6 +1,6 @@
-import re
 from collections import defaultdict
 from enum import Enum
+import re
 
 MINIMUM_API_SUPPORT = "1.05.00"
 
@@ -80,7 +80,7 @@ FLAGS_BY_VERSION = {
     "1.03.00": [
         FeatureFlag.SUPPORT_DMS_3_1_MM,
         FeatureFlag.EVENT_KEY_CODE,
-        FeatureFlag.PROPERTY_IP_ADDRESS
+        FeatureFlag.PROPERTY_IP_ADDRESS,
     ],
     "1.04.00": [
         FeatureFlag.SUPPORT_SHUFFLE,
@@ -106,9 +106,7 @@ FLAGS_BY_VERSION = {
         FeatureFlag.SUPPORT_MEDIA_RATING,
         FeatureFlag.SUPPORT_HIDDEN_ATTRIBUTE,
     ],
-    "1.08.00": [
-        FeatureFlag.SUPPORT_SYSTEM_FAVORITE_RENAME
-    ],
+    "1.08.00": [FeatureFlag.SUPPORT_SYSTEM_FAVORITE_RENAME],
     "1.09.00": [
         FeatureFlag.COMMANDS_ZONE_MUTE_OFF_ON,
     ],
@@ -136,16 +134,13 @@ FLAGS_BY_VERSION = {
         FeatureFlag.PROPERTY_PLAY_TIME,
         FeatureFlag.PROPERTY_TRACK_TIME,
         FeatureFlag.PROPERTY_SET_SEEK_TIME,
-        FeatureFlag.SUPPORT_MM_CONTEXT_MENU
+        FeatureFlag.SUPPORT_MM_CONTEXT_MENU,
     ],
     "1.14.01": [
         FeatureFlag.PROPERTY_SLEEP_TIME_DEFAULT,
         FeatureFlag.PROPERTY_SUPPORT_SLEEP_TIME,
     ],
-    "1.15.00": [
-        FeatureFlag.EVENT_REBOOT,
-        FeatureFlag.SUPPORT_SYSTEM_FAVORITE_SOURCE
-    ],
+    "1.15.00": [FeatureFlag.EVENT_REBOOT, FeatureFlag.SUPPORT_SYSTEM_FAVORITE_SOURCE],
     "1.15.02": [
         FeatureFlag.ATTRIBUTE_USER_LOGIN,
     ],
@@ -153,12 +148,9 @@ FLAGS_BY_VERSION = {
 
 VERSIONS_BY_FLAGS = defaultdict(list)
 
-ZONE_PROPERTIES = [
-    'currentSource'
-]
+ZONE_PROPERTIES = ["currentSource"]
 
-SOURCE_PROPERTIES = [
-]
+SOURCE_PROPERTIES = []
 
 for version, flags in FLAGS_BY_VERSION.items():
     for flag in flags:
