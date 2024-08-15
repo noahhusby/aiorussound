@@ -26,8 +26,8 @@ class Russound:
         provided.
         """
         self._loop = loop
-        self._host = host
-        self._port = port
+        self.host = host
+        self.port = port
         self._ioloop_future = None
         self._cmd_queue = asyncio.Queue()
         self._state = {}
@@ -214,8 +214,8 @@ class Russound:
         Connect to the controller and start processing responses.
         """
         self._connection_started = True
-        _LOGGER.info("Connecting to %s:%s", self._host, self._port)
-        reader, writer = await asyncio.open_connection(self._host, self._port)
+        _LOGGER.info("Connecting to %s:%s", self.host, self.port)
+        reader, writer = await asyncio.open_connection(self.host, self.port)
         self._ioloop_future = ensure_future(self._ioloop(reader, writer, reconnect))
         self.rio_version = await self._send_cmd('VERSION')
         if not is_fw_version_higher(self.rio_version, MINIMUM_API_SUPPORT):
@@ -230,7 +230,7 @@ class Russound:
         Disconnect from the controller.
         """
         self._connection_started = False
-        _LOGGER.info("Closing connection to %s:%s", self._host, self._port)
+        _LOGGER.info("Closing connection to %s:%s", self.host, self.port)
         self._ioloop_future.cancel()
         try:
             await self._ioloop_future
