@@ -1,3 +1,7 @@
+"""Asynchronous Python client for Russound RIO."""
+
+from __future__ import annotations
+
 from collections import defaultdict
 from enum import Enum
 import re
@@ -12,12 +16,14 @@ TIMEOUT = 5.0
 MAX_SOURCE = 17
 
 RESPONSE_REGEX = re.compile(
-    r"^(?:C\[(?P<controller>\d+)](?:\.Z\[(?P<zone>\d+)])?|S\[(?P<source>\d+)])?\.(?P<variable>\S+)=\s*\"("
-    r"?P<value>.*)\"$|^(?P<variable_only>\S+)=\s*\"(?P<value_only>.*)\"$"
+    r"^(?:C\[(?P<controller>\d+)](?:\.Z\[(?P<zone>\d+)])?|S\[(?P<source>\d+)])?\."
+    r"(?P<variable>\S+)=\s*\"(?P<value>.*)\"$|^(?P<variable_only>\S+)=\s*\"(?P<value_only>.*)\"$"
 )
 
 
 class FeatureFlag(Enum):
+    """A list of Russound RIO API features."""
+
     SUPPORT_POWER_MGMT = 1
     SUPPORT_ZONE_PARAMETERS = 2
     SUPPORT_SOURCE_PARAMETERS = 3
@@ -148,9 +154,9 @@ FLAGS_BY_VERSION = {
 
 VERSIONS_BY_FLAGS = defaultdict(list)
 
-ZONE_PROPERTIES = ["currentSource"]
+ZONE_PROPERTIES: list[str] = ["currentSource"]
 
-SOURCE_PROPERTIES = []
+SOURCE_PROPERTIES: list[str] = []
 
 for version, flags in FLAGS_BY_VERSION.items():
     for flag in flags:

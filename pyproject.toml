@@ -37,10 +37,11 @@ ignore = [
   "ANN401", # Opinioated warning on disallowing dynamically typed expressions
   "COM812", # Conflicts with other rules
   "D203", # Conflicts with other rules
+  "D205",
   "D213", # Conflicts with other rules
   "D417", # False positives in some occasions
   "ISC001", # Conflicts with other rules
-  "PLR2004", # Just annoying, not really useful
+  "PLR2004", # Just annoying, not really useful,
 ]
 select = ["ALL"]
 

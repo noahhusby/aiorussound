@@ -1,3 +1,5 @@
+"""Asynchronous Python client for Russound RIO."""
+
 from .exceptions import (
     CommandException,
     UncachedVariable,
