@@ -45,4 +45,3 @@ The RS232 port must be configured to use the RIO protocol instead of the RNET pr
 
 ## Acknowledgements
 This is the continuation of the `russound_rio` package. This wouldn't be possible without the excellent work from [@wickerwaka](https://github.com/wickerwaka) and [@chphilli](https://github.com/chphilli).
-

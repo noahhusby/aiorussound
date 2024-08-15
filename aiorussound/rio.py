@@ -1,12 +1,31 @@
 import asyncio
+from asyncio import AbstractEventLoop, StreamReader, StreamWriter
 import logging
-from asyncio import StreamWriter, StreamReader, AbstractEventLoop
 
-from aiorussound.const import FeatureFlag, MINIMUM_API_SUPPORT, FLAGS_BY_VERSION, RESPONSE_REGEX, DEFAULT_PORT, \
-    RECONNECT_DELAY, ZONE_PROPERTIES, SOURCE_PROPERTIES, MAX_SOURCE
-from aiorussound.exceptions import UncachedVariable, CommandException, UnsupportedRussoundVersion
-from aiorussound.util import is_feature_supported, is_fw_version_higher, zone_device_str, source_device_str, \
-    controller_device_str, get_max_zones
+from aiorussound.const import (
+    DEFAULT_PORT,
+    FLAGS_BY_VERSION,
+    MAX_SOURCE,
+    MINIMUM_API_SUPPORT,
+    RECONNECT_DELAY,
+    RESPONSE_REGEX,
+    SOURCE_PROPERTIES,
+    ZONE_PROPERTIES,
+    FeatureFlag,
+)
+from aiorussound.exceptions import (
+    CommandException,
+    UncachedVariable,
+    UnsupportedRussoundVersion,
+)
+from aiorussound.util import (
+    controller_device_str,
+    get_max_zones,
+    is_feature_supported,
+    is_fw_version_higher,
+    source_device_str,
+    zone_device_str,
+)
 
 # Maintain compat with various 3.x async changes
 if hasattr(asyncio, "ensure_future"):
@@ -21,8 +40,7 @@ class Russound:
     """Manages the RIO connection to a Russound device."""
 
     def __init__(self, loop: AbstractEventLoop, host: str, port=DEFAULT_PORT):
-        """
-        Initialize the Russound object using the event loop, host and port
+        """Initialize the Russound object using the event loop, host and port
         provided.
         """
         self._loop = loop
@@ -40,23 +58,19 @@ class Russound:
         self.connected = False
 
     def _retrieve_cached_variable(self, device_str: str, key: str):
-        """
-        Retrieves the cache state of the named variable for a particular
+        """Retrieves the cache state of the named variable for a particular
         device. If the variable has not been cached then the UncachedVariable
         exception is raised.
         """
         try:
             s = self._state[device_str][key.lower()]
-            _LOGGER.debug(
-                "Zone Cache retrieve %s.%s = %s", device_str, key, s
-            )
+            _LOGGER.debug("Zone Cache retrieve %s.%s = %s", device_str, key, s)
             return s
         except KeyError:
             raise UncachedVariable
 
     def _store_cached_variable(self, device_str: str, key: str, value: str):
-        """
-        Stores the current known value of a device variable into the cache.
+        """Stores the current known value of a device variable into the cache.
         Calls any device callbacks.
         """
         zone_state = self._state.setdefault(device_str, {})
@@ -67,7 +81,7 @@ class Russound:
         for callback in self._callbacks.get(device_str, []):
             callback(device_str, key, value)
         # Handle source callback
-        if device_str[0] == 'S':
+        if device_str[0] == "S":
             for controller in self._controllers.values():
                 for zone in controller.zones.values():
                     source = zone.fetch_current_source()
@@ -91,11 +105,15 @@ class Russound:
         p = m.groupdict()
         if p["source"]:
             source_id = int(p["source"])
-            self._store_cached_variable(source_device_str(source_id), p["variable"], p["value"])
+            self._store_cached_variable(
+                source_device_str(source_id), p["variable"], p["value"]
+            )
         elif p["zone"]:
             controller_id = int(p["controller"])
             zone_id = int(p["zone"])
-            self._store_cached_variable(zone_device_str(controller_id, zone_id), p["variable"], p["value"])
+            self._store_cached_variable(
+                zone_device_str(controller_id, zone_id), p["variable"], p["value"]
+            )
 
         return ty, p["value"] or p["value_only"]
 
@@ -105,7 +123,9 @@ class Russound:
             _LOGGER.debug("Sending keep alive to device")
             await self._send_cmd("VERSION")
 
-    async def _ioloop(self, reader: StreamReader, writer: StreamWriter, reconnect: bool):
+    async def _ioloop(
+        self, reader: StreamReader, writer: StreamWriter, reconnect: bool
+    ):
         queue_future = ensure_future(self._cmd_queue.get())
         net_future = ensure_future(reader.readline())
         keep_alive_task = asyncio.create_task(self._keep_alive())
@@ -176,8 +196,7 @@ class Russound:
         return r
 
     def _add_callback(self, device_str: str, callback):
-        """
-        Registers a callback to be called whenever a device variable changes.
+        """Registers a callback to be called whenever a device variable changes.
         The callback will be passed three arguments: the device_str, the variable
         name and the variable value.
         """
@@ -185,23 +204,18 @@ class Russound:
         callbacks.append(callback)
 
     def _remove_callback(self, callback):
-        """
-        Removes a previously registered callback.
-        """
+        """Removes a previously registered callback."""
         for callbacks in self._callbacks.values():
             callbacks.remove(callback)
 
     def add_connection_callback(self, callback):
-        """
-        Registers a callback to be called whenever the instance is connected/disconnected.
+        """Registers a callback to be called whenever the instance is connected/disconnected.
         The callback will be passed one argument: connected: bool.
         """
         self._connection_callbacks.append(callback)
 
     def remove_connection_callback(self, callback):
-        """
-        Removes a previously registered callback.
-        """
+        """Removes a previously registered callback."""
         self._connection_callbacks.remove(callback)
 
     def _set_connected(self, connected: bool):
@@ -210,25 +224,23 @@ class Russound:
             callback(connected)
 
     async def connect(self, reconnect=True):
-        """
-        Connect to the controller and start processing responses.
-        """
+        """Connect to the controller and start processing responses."""
         self._connection_started = True
         _LOGGER.info("Connecting to %s:%s", self.host, self.port)
         reader, writer = await asyncio.open_connection(self.host, self.port)
         self._ioloop_future = ensure_future(self._ioloop(reader, writer, reconnect))
-        self.rio_version = await self._send_cmd('VERSION')
+        self.rio_version = await self._send_cmd("VERSION")
         if not is_fw_version_higher(self.rio_version, MINIMUM_API_SUPPORT):
-            raise UnsupportedRussoundVersion(f"Russound RIO API v{self.rio_version} is not supported. The minimum "
-                                             f"supported version is v{MINIMUM_API_SUPPORT}")
+            raise UnsupportedRussoundVersion(
+                f"Russound RIO API v{self.rio_version} is not supported. The minimum "
+                f"supported version is v{MINIMUM_API_SUPPORT}"
+            )
         _LOGGER.info(f"Connected (Russound RIO v{self.rio_version})")
         await self._watch_cached_devices()
         self._set_connected(True)
 
     async def close(self):
-        """
-        Disconnect from the controller.
-        """
+        """Disconnect from the controller."""
         self._connection_started = False
         _LOGGER.info("Closing connection to %s:%s", self.host, self.port)
         self._ioloop_future.cancel()
@@ -239,16 +251,14 @@ class Russound:
         self._set_connected(False)
 
     async def set_variable(self, device_str: str, key: str, value: str):
-        """
-        Set a zone variable to a new value.
-        """
+        """Set a zone variable to a new value."""
         return self._send_cmd(f'SET {device_str}.{key}="{value}"')
 
     async def get_variable(self, device_str: str, key: str):
         """Retrieve the current value of a zone variable.  If the variable is
         not found in the local cache then the value is requested from the
-        controller."""
-
+        controller.
+        """
         try:
             return self._retrieve_cached_variable(device_str, key)
         except UncachedVariable:
@@ -256,7 +266,8 @@ class Russound:
 
     def get_cached_variable(self, device_str: str, key: str, default=None):
         """Retrieve the current value of a zone variable from the cache or
-        return the default value if the variable is not present."""
+        return the default value if the variable is not present.
+        """
         try:
             return self._retrieve_cached_variable(device_str, key)
         except UncachedVariable:
@@ -269,32 +280,35 @@ class Russound:
         for controller_id in range(1, 9):
             device_str = controller_device_str(controller_id)
             try:
-                controller_type = await self.get_variable(
-                    device_str, "type"
-                )
+                controller_type = await self.get_variable(device_str, "type")
                 if not controller_type:
                     continue
                 mac_address = None
                 try:
-                    mac_address = await self.get_variable(
-                        device_str, "macAddress"
-                    )
+                    mac_address = await self.get_variable(device_str, "macAddress")
                 except CommandException:
                     pass
                 firmware_version = None
-                if is_feature_supported(self.rio_version, FeatureFlag.PROPERTY_FIRMWARE_VERSION):
+                if is_feature_supported(
+                    self.rio_version, FeatureFlag.PROPERTY_FIRMWARE_VERSION
+                ):
                     firmware_version = await self.get_variable(
                         device_str, "firmwareVersion"
                     )
-                controller = Controller(self, controllers.get(1, None), controller_id, mac_address, controller_type,
-                                        firmware_version)
+                controller = Controller(
+                    self,
+                    controllers.get(1),
+                    controller_id,
+                    mac_address,
+                    controller_type,
+                    firmware_version,
+                )
                 await controller.fetch_configuration()
                 controllers[controller_id] = controller
             except CommandException:
                 continue
         self._controllers = controllers
         return controllers
-
 
     @property
     def supported_features(self):
@@ -322,8 +336,15 @@ class Russound:
 class Controller:
     """Uniquely identifies a controller"""
 
-    def __init__(self, instance: Russound, parent_controller, controller_id: int, mac_address: str,
-                 controller_type: str, firmware_version: str):
+    def __init__(
+        self,
+        instance: Russound,
+        parent_controller,
+        controller_id: int,
+        mac_address: str,
+        controller_type: str,
+        firmware_version: str,
+    ):
         self.instance = instance
         self.parent_controller = parent_controller
         self.controller_id = controller_id
@@ -343,8 +364,8 @@ class Controller:
 
     def __eq__(self, other):
         return (
-                hasattr(other, "controller_id")
-                and other.controller_id == self.controller_id
+            hasattr(other, "controller_id")
+            and other.controller_id == self.controller_id
         )
 
     def __hash__(self):
@@ -394,7 +415,9 @@ class Zone:
     belong to and the controller index (1-N) within the entire system.
     """
 
-    def __init__(self, instance: Russound, controller: Controller, zone_id: int, name: str):
+    def __init__(
+        self, instance: Russound, controller: Controller, zone_id: int, name: str
+    ):
         self.instance = instance
         self.controller = controller
         self.zone_id = int(zone_id)
@@ -412,18 +435,17 @@ class Zone:
 
     def __eq__(self, other):
         return (
-                hasattr(other, "zone_id")
-                and hasattr(other, "controller")
-                and other.zone_id == self.zone_id
-                and other.controller == self.controller
+            hasattr(other, "zone_id")
+            and hasattr(other, "controller")
+            and other.zone_id == self.zone_id
+            and other.controller == self.controller
         )
 
     def __hash__(self):
         return hash(str(self))
 
     def device_str(self):
-        """
-        Generate a string that can be used to reference this zone in a RIO
+        """Generate a string that can be used to reference this zone in a RIO
         command
         """
         return zone_device_str(self.controller.controller_id, self.zone_id)
@@ -432,7 +454,8 @@ class Zone:
         """Add a zone to the watchlist.
         Zones on the watchlist will push all
         state changes (and those of the source they are currently connected to)
-        back to the client"""
+        back to the client
+        """
         return await self.instance._watch(self.device_str())
 
     async def unwatch(self):
@@ -460,7 +483,7 @@ class Zone:
     @property
     def current_source(self):
         # Default to one if not available at the present time
-        return self._get('currentSource', '1')
+        return self._get("currentSource", "1")
 
     def fetch_current_source(self):
         current_source = int(self.current_source)
@@ -468,112 +491,114 @@ class Zone:
 
     @property
     def volume(self):
-        return self._get('volume', '0')
+        return self._get("volume", "0")
 
     @property
     def bass(self):
-        return self._get('bass')
+        return self._get("bass")
 
     @property
     def treble(self):
-        return self._get('treble')
+        return self._get("treble")
 
     @property
     def balance(self):
-        return self._get('balance')
+        return self._get("balance")
 
     @property
     def loudness(self):
-        return self._get('loudness')
+        return self._get("loudness")
 
     @property
     def turn_on_volume(self):
-        return self._get('turnOnVolume')
+        return self._get("turnOnVolume")
 
     @property
     def do_not_disturb(self):
-        return self._get('doNotDisturb')
+        return self._get("doNotDisturb")
 
     @property
     def party_mode(self):
-        return self._get('partyMode')
+        return self._get("partyMode")
 
     @property
     def status(self):
-        return self._get('status', 'OFF')
+        return self._get("status", "OFF")
 
     @property
     def is_mute(self):
-        return self._get('mute')
+        return self._get("mute")
 
     @property
     def shared_source(self):
-        return self._get('sharedSource')
+        return self._get("sharedSource")
 
     @property
     def last_error(self):
-        return self._get('lastError')
+        return self._get("lastError")
 
     @property
     def page(self):
-        return self._get('page')
+        return self._get("page")
 
     @property
     def sleep_time_default(self):
-        return self._get('sleepTimeDefault')
+        return self._get("sleepTimeDefault")
 
     @property
     def sleep_time_remaining(self):
-        return self._get('sleepTimeRemaining')
+        return self._get("sleepTimeRemaining")
 
     @property
     def enabled(self):
-        return self._get('enabled')
+        return self._get("enabled")
 
     async def mute(self):
-        return await self.send_event('ZoneMuteOn')
+        return await self.send_event("ZoneMuteOn")
 
     async def unmute(self):
-        return await self.send_event('ZoneMuteOff')
+        return await self.send_event("ZoneMuteOff")
 
     async def set_volume(self, volume):
-        return await self.send_event('KeyPress', 'Volume', volume)
+        return await self.send_event("KeyPress", "Volume", volume)
 
     async def volume_up(self):
-        return await self.send_event('KeyPress', 'VolumeUp')
+        return await self.send_event("KeyPress", "VolumeUp")
 
     async def volume_down(self):
-        return await self.send_event('KeyPress', 'VolumeDown')
+        return await self.send_event("KeyPress", "VolumeDown")
 
     async def previous(self):
-        return await self.send_event('KeyPress', 'Previous')
+        return await self.send_event("KeyPress", "Previous")
 
     async def next(self):
-        return await self.send_event('KeyPress', 'Next')
+        return await self.send_event("KeyPress", "Next")
 
     async def stop(self):
-        return await self.send_event('KeyPress', 'Stop')
+        return await self.send_event("KeyPress", "Stop")
 
     async def pause(self):
-        return await self.send_event('KeyPress', 'Pause')
+        return await self.send_event("KeyPress", "Pause")
 
     async def play(self):
-        return await self.send_event('KeyPress', 'Play')
+        return await self.send_event("KeyPress", "Play")
 
     async def zone_on(self):
-        return await self.send_event('ZoneOn')
+        return await self.send_event("ZoneOn")
 
     async def zone_off(self):
-        return await self.send_event('ZoneOff')
+        return await self.send_event("ZoneOff")
 
     async def select_source(self, source: int):
-        return await self.send_event('SelectSource', source)
+        return await self.send_event("SelectSource", source)
 
 
 class Source:
     """Uniquely identifies a Source"""
 
-    def __init__(self, instance: Russound, controller: Controller, source_id: int, name: str):
+    def __init__(
+        self, instance: Russound, controller: Controller, source_id: int, name: str
+    ):
         self.instance = instance
         self.controller = controller
         self.source_id = int(source_id)
@@ -591,18 +616,17 @@ class Source:
 
     def __eq__(self, other):
         return (
-                hasattr(other, "source_id")
-                and hasattr(other, "controller")
-                and other.source_id == self.source_id
-                and other.controller == self.controller
+            hasattr(other, "source_id")
+            and hasattr(other, "controller")
+            and other.source_id == self.source_id
+            and other.controller == self.controller
         )
 
     def __hash__(self):
         return hash(str(self))
 
     def device_str(self):
-        """
-        Generate a string that can be used to reference this zone in a RIO
+        """Generate a string that can be used to reference this zone in a RIO
         command
         """
         return source_device_str(self.source_id)
@@ -617,7 +641,8 @@ class Source:
         """Add a source to the watchlist.
         Sources on the watchlist will push all
         state changes (and those of the source they are currently connected to)
-        back to the client"""
+        back to the client
+        """
         return await self.instance._watch(self.device_str())
 
     async def unwatch(self):
@@ -638,80 +663,80 @@ class Source:
 
     @property
     def type(self):
-        return self._get('type')
+        return self._get("type")
 
     @property
     def channel(self):
-        return self._get('channel')
+        return self._get("channel")
 
     @property
     def cover_art_url(self):
-        return self._get('coverArtURL')
+        return self._get("coverArtURL")
 
     @property
     def channel_name(self):
-        return self._get('channelName')
+        return self._get("channelName")
 
     @property
     def genre(self):
-        return self._get('genre')
+        return self._get("genre")
 
     @property
     def artist_name(self):
-        return self._get('artistName')
+        return self._get("artistName")
 
     @property
     def album_name(self):
-        return self._get('albumName')
+        return self._get("albumName")
 
     @property
     def playlist_name(self):
-        return self._get('playlistName')
+        return self._get("playlistName")
 
     @property
     def song_name(self):
-        return self._get('songName')
+        return self._get("songName")
 
     @property
     def program_service_name(self):
-        return self._get('programServiceName')
+        return self._get("programServiceName")
 
     @property
     def radio_text(self):
-        return self._get('radioText')
+        return self._get("radioText")
 
     @property
     def shuffle_mode(self):
-        return self._get('shuffleMode')
+        return self._get("shuffleMode")
 
     @property
     def repeat_mode(self):
-        return self._get('repeatMode')
+        return self._get("repeatMode")
 
     @property
     def mode(self):
-        return self._get('mode')
+        return self._get("mode")
 
     @property
     def play_status(self):
-        return self._get('playStatus')
+        return self._get("playStatus")
 
     @property
     def sample_rate(self):
-        return self._get('sampleRate')
+        return self._get("sampleRate")
 
     @property
     def bit_rate(self):
-        return self._get('bitRate')
+        return self._get("bitRate")
 
     @property
     def bit_depth(self):
-        return self._get('bitDepth')
+        return self._get("bitDepth")
 
     @property
     def play_time(self):
-        return self._get('playTime')
+        return self._get("playTime")
 
     @property
     def track_time(self):
-        return self._get('trackTime')
+        return self._get("trackTime")

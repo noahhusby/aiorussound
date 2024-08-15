@@ -1,16 +1,14 @@
 import asyncio
 import logging
+import os
 
 # Add project directory to the search path so that version of the module
 # is used for tests.
 import sys
-import os
 
-from aiorussound.const import FeatureFlag
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), ".."))
 
-sys.path.insert(1, os.path.join(os.path.dirname(__file__), '..'))
-
-from aiorussound import Russound, Controller, Zone  # noqa: E402
+from aiorussound import Russound, Zone
 
 
 async def demo(loop, host):
