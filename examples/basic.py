@@ -1,4 +1,7 @@
+"""Example for Russound RIO package"""
+
 import asyncio
+from asyncio import AbstractEventLoop
 import logging
 import os
 
@@ -10,29 +13,31 @@ sys.path.insert(1, os.path.join(os.path.dirname(__file__), ".."))
 
 from aiorussound import Russound, Zone
 
+_LOGGER = logging.getLogger(__package__)
 
-async def demo(loop, host):
+
+async def demo(loop: AbstractEventLoop, host: str) -> None:
     rus = Russound(loop, host)
     await rus.connect()
-    print("Supported Features:")
+    _LOGGER.info("Supported Features:")
     for flag in rus.supported_features:
-        print(flag)
-    print("Finding controllers")
+        _LOGGER.info(flag)
+    _LOGGER.info("Finding controllers")
     controllers = await rus.enumerate_controllers()
 
     for c in controllers.values():
-        print("%s (%s): %s" % (c.controller_id, c.mac_address, c.controller_type))
+        _LOGGER.info("%s (%s): %s", c.controller_id, c.mac_address, c.controller_id)
 
-        print("Determining valid zones")
+        _LOGGER.info("Determining valid zones")
         # Determine Zones
 
         for zone_id, zone in c.zones.items():
             await zone.watch()
-            print("%s: %s" % (zone_id, zone.name))
+            _LOGGER.info("%s: %s", zone_id, zone.name)
 
         for source_id, source in c.sources.items():
             await source.watch()
-            print("%s: %s" % (source_id, source.name))
+            _LOGGER.info("%s: %s", source_id, source.name)
 
         for _ in range(5):
             con: Zone = c.zones.get(1)

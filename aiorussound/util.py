@@ -1,24 +1,31 @@
+"""Asynchronous Python client for Russound RIO."""
+
 import re
 
 from aiorussound.const import VERSIONS_BY_FLAGS, FeatureFlag
-from aiorussound.exceptions import UnsupportedFeature
+from aiorussound.exceptions import UnsupportedFeatureError
 
 _fw_pattern = re.compile(r"^(?P<major>\d{1,2})\.(?P<minor>\d{2})\.(?P<patch>\d{2})$")
 
 
 def raise_unsupported_feature(api_ver: str, flag: FeatureFlag) -> None:
+    """Raise an UnsupportedFeature exception if the specified feature is not supported
+    in the provided version.
+    """
     if not is_feature_supported(api_ver, flag):
-        raise UnsupportedFeature(
-            f"Russound feature {flag} not supported in api v{api_ver}"
-        )
+        err = f"Russound feature {flag} not supported in api v{api_ver}"
+        raise UnsupportedFeatureError(err)
 
 
 def is_feature_supported(api_ver: str, flag: FeatureFlag) -> bool:
+    """Return true if the feature is supported in the provided version,
+    false otherwise.
+    """
     return is_fw_version_higher(api_ver, VERSIONS_BY_FLAGS[flag])
 
 
 def is_fw_version_higher(fw_a: str, fw_b: str) -> bool:
-    """Returns true if fw_a is greater than or equal to fw_b"""
+    """Return true if fw_a is greater than or equal to fw_b."""
     a_match = _fw_pattern.match(fw_a)
     b_match = _fw_pattern.match(fw_b)
 
@@ -41,21 +48,24 @@ def is_fw_version_higher(fw_a: str, fw_b: str) -> bool:
 
 
 def controller_device_str(controller_id: int) -> str:
+    """Return a string representation of the specified controller device."""
     return f"C[{controller_id}]"
 
 
 def zone_device_str(controller_id: int, zone_id: int) -> str:
+    """Return a string representation of the specified zone device."""
     return f"C[{controller_id}].Z[{zone_id}]"
 
 
 def source_device_str(source_id: int) -> str:
+    """Return a string representation of the specified source device."""
     return f"S[{source_id}]"
 
 
 def get_max_zones(model: str) -> int:
+    """Return a maximum number of zones supported by a specific controller."""
     if model in ("MCA-88", "MCA-88X", "MCA-C5"):
         return 8
-    elif model in ("MCA-66", "MCA-C3"):
+    if model in ("MCA-66", "MCA-C3"):
         return 6
-    else:
-        return 1
+    return 1

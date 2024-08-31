@@ -14,9 +14,7 @@ documentation = "https://github.com/noahhusby/aiorussound"
 python = "^3.11"
 
 [tool.poetry.group.dev.dependencies]
-codespell = "2.3.0"
-covdefaults = "2.3.0"
-coverage = {version = "7.6.1", extras = ["toml"]}
+coverage = {version = "7.6.1"}
 mypy = "1.11.1"
 pre-commit = "3.8.0"
 pre-commit-hooks = "4.6.0"
@@ -25,22 +23,19 @@ pytest = "8.3.2"
 pytest-asyncio = "0.23.8"
 pytest-cov = "5.0.0"
 ruff = "0.5.7"
-safety = "3.2.5"
-yamllint = "1.35.1"
-syrupy = "4.6.1"
-aioresponses = "0.7.6"
 
 [tool.ruff.lint]
 ignore = [
   "ANN101", # Self... explanatory
   "ANN102", # cls... just as useless
-  "ANN401", # Opinioated warning on disallowing dynamically typed expressions
-  "COM812", # Conflicts with other rules
-  "D203", # Conflicts with other rules
-  "D213", # Conflicts with other rules
-  "D417", # False positives in some occasions
-  "ISC001", # Conflicts with other rules
-  "PLR2004", # Just annoying, not really useful
+  "ANN401",
+  "COM812",
+  "D203",
+  "D205",
+  "D213",
+  "D417",
+  "ISC001",
+  "PLR2004",
 ]
 select = ["ALL"]
 
@@ -60,4 +55,4 @@ max-complexity = 25
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core"]
