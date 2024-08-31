@@ -45,7 +45,7 @@ class Russound:
     """Manages the RIO connection to a Russound device."""
 
     def __init__(
-        self, loop: AbstractEventLoop, host: str, port: int = DEFAULT_PORT
+            self, loop: AbstractEventLoop, host: str, port: int = DEFAULT_PORT
     ) -> None:
         """Initialize the Russound object using the event loop, host and port
         provided.
@@ -61,6 +61,7 @@ class Russound:
         self._connection_started: bool = False
         self._watched_devices: dict[str, bool] = {}
         self._controllers: dict[int, Controller] = {}
+        self.sources: dict[int, Zone] = {}
         self.rio_version: str | None = None
         self.connected: bool = False
 
@@ -131,7 +132,7 @@ class Russound:
             await self.send_cmd("VERSION")
 
     async def _ioloop(
-        self, reader: StreamReader, writer: StreamWriter, reconnect: bool
+            self, reader: StreamReader, writer: StreamWriter, reconnect: bool
     ) -> None:
         queue_future = ensure_future(self._cmd_queue.get())
         net_future = ensure_future(reader.readline())
@@ -258,7 +259,7 @@ class Russound:
         self._set_connected(False)
 
     async def set_variable(
-        self, device_str: str, key: str, value: str
+            self, device_str: str, key: str, value: str
     ) -> Coroutine[Any, Any, str]:
         """Set a zone variable to a new value."""
         return self.send_cmd(f'SET {device_str}.{key}="{value}"')
@@ -301,7 +302,7 @@ class Russound:
                     pass
                 firmware_version = None
                 if is_feature_supported(
-                    self.rio_version, FeatureFlag.PROPERTY_FIRMWARE_VERSION
+                        self.rio_version, FeatureFlag.PROPERTY_FIRMWARE_VERSION
                 ):
                     firmware_version = await self.get_variable(
                         device_str, "firmwareVersion"
@@ -346,18 +347,32 @@ class Russound:
         for device in self._watched_devices.keys():
             await self.watch(device)
 
+    async def init_sources(self) -> None:
+        """Return a list of (zone_id, zone) tuples."""
+        self.sources = {}
+        for source_id in range(1, MAX_SOURCE):
+            try:
+                device_str = source_device_str(source_id)
+                name = await self.get_variable(device_str, "name")
+                if name:
+                    source = Source(self, source_id, name)
+                    await source.fetch_configuration()
+                    self.sources[source_id] = source
+            except CommandError:
+                break
+
 
 class Controller:
     """Uniquely identifies a controller."""
 
     def __init__(
-        self,
-        instance: Russound,
-        parent_controller: Controller,
-        controller_id: int,
-        mac_address: str,
-        controller_type: str,
-        firmware_version: str,
+            self,
+            instance: Russound,
+            parent_controller: Controller,
+            controller_id: int,
+            mac_address: str,
+            controller_type: str,
+            firmware_version: str,
     ) -> None:
         """Initialize the controller."""
         self.instance = instance
@@ -367,12 +382,10 @@ class Controller:
         self.controller_type = controller_type
         self.firmware_version = firmware_version
         self.zones: dict[int, Zone] = {}
-        self.sources: dict[int, Zone] = {}
         self.max_zones = get_max_zones(controller_type)
 
     async def fetch_configuration(self) -> None:
         """Fetches source and zone configuration from controller."""
-        await self._init_sources()
         await self._init_zones()
 
     def __str__(self) -> str:
@@ -382,8 +395,8 @@ class Controller:
     def __eq__(self, other: object) -> bool:
         """Equality check."""
         return (
-            hasattr(other, "controller_id")
-            and other.controller_id == self.controller_id
+                hasattr(other, "controller_id")
+                and other.controller_id == self.controller_id
         )
 
     def __hash__(self) -> int:
@@ -405,20 +418,6 @@ class Controller:
             except CommandError:
                 break
 
-    async def _init_sources(self) -> None:
-        """Return a list of (zone_id, zone) tuples."""
-        self.sources = {}
-        for source_id in range(1, MAX_SOURCE):
-            try:
-                device_str = source_device_str(source_id)
-                name = await self.instance.get_variable(device_str, "name")
-                if name:
-                    source = Source(self.instance, self, source_id, name)
-                    await source.fetch_configuration()
-                    self.sources[source_id] = source
-            except CommandError:
-                break
-
     def add_callback(self, callback) -> None:
         """Add a callback function to be called when a zone is changed."""
         self.instance.add_callback(controller_device_str(self.controller_id), callback)
@@ -437,7 +436,7 @@ class Zone:
     """
 
     def __init__(
-        self, instance: Russound, controller: Controller, zone_id: int, name: str
+            self, instance: Russound, controller: Controller, zone_id: int, name: str
     ) -> None:
         """Initialize a zone object."""
         self.instance = instance
@@ -460,10 +459,10 @@ class Zone:
     def __eq__(self, other: object) -> bool:
         """Equality check."""
         return (
-            hasattr(other, "zone_id")
-            and hasattr(other, "controller")
-            and other.zone_id == self.zone_id
-            and other.controller == self.controller
+                hasattr(other, "zone_id")
+                and hasattr(other, "controller")
+                and other.zone_id == self.zone_id
+                and other.controller == self.controller
         )
 
     def __hash__(self) -> int:
@@ -513,7 +512,7 @@ class Zone:
     def fetch_current_source(self) -> Zone:
         """Return the current source as a source object."""
         current_source = int(self.current_source)
-        return self.controller.sources[current_source]
+        return self.instance.sources[current_source]
 
     @property
     def volume(self) -> str:
@@ -652,11 +651,10 @@ class Source:
     """Uniquely identifies a Source."""
 
     def __init__(
-        self, instance: Russound, controller: Controller, source_id: int, name: str
+            self, instance: Russound, source_id: int, name: str
     ) -> None:
         """Initialize a Source."""
         self.instance = instance
-        self.controller = controller
         self.source_id = int(source_id)
         self.name = name
 
@@ -670,15 +668,13 @@ class Source:
 
     def __str__(self) -> str:
         """Return the current configuration of the source."""
-        return f"{self.controller.mac_address} > S{self.source_id}"
+        return f"S{self.source_id}"
 
     def __eq__(self, other: object) -> bool:
         """Equality check."""
         return (
-            hasattr(other, "source_id")
-            and hasattr(other, "controller")
-            and other.source_id == self.source_id
-            and other.controller == self.controller
+                hasattr(other, "source_id")
+                and other.source_id == self.source_id
         )
 
     def __hash__(self) -> int:
@@ -714,7 +710,7 @@ class Source:
     async def send_event(self, event_name: str, *args: tuple[str, ...]) -> str:
         """Send an event to a source."""
         cmd = (
-            f"EVENT {self.device_str()}!{event_name} %{ " ".join(str(x) for x in args)}"
+            f"EVENT {self.device_str()}!{event_name} %{" ".join(str(x) for x in args)}"
         )
         return await self.instance.send_cmd(cmd)
 

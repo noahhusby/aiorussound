@@ -22,6 +22,13 @@ async def demo(loop: AbstractEventLoop, host: str) -> None:
     _LOGGER.info("Supported Features:")
     for flag in rus.supported_features:
         _LOGGER.info(flag)
+
+    _LOGGER.info("Finding sources")
+    await rus.init_sources()
+    for source_id, source in rus.sources.items():
+        await source.watch()
+        _LOGGER.info("%s: %s", source_id, source.name)
+
     _LOGGER.info("Finding controllers")
     controllers = await rus.enumerate_controllers()
 
@@ -35,9 +42,6 @@ async def demo(loop: AbstractEventLoop, host: str) -> None:
             await zone.watch()
             _LOGGER.info("%s: %s", zone_id, zone.name)
 
-        for source_id, source in c.sources.items():
-            await source.watch()
-            _LOGGER.info("%s: %s", source_id, source.name)
 
         for _ in range(5):
             con: Zone = c.zones.get(1)
