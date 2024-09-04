@@ -9,7 +9,7 @@ readme = "README.md"
 homepage = "https://github.com/noahhusby/aiorussound"
 repository = "https://github.com/noahhusby/aiorussound"
 documentation = "https://github.com/noahhusby/aiorussound"
-requires-python = "^3.11"
+
 
 [tool.poetry.dependencies]
 python = "^3.11"
