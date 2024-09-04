@@ -13,14 +13,14 @@ from aiorussound.connection import RussoundTcpConnectionHandler
 
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), ".."))
 
-from aiorussound import Russound, Zone
+from aiorussound import Zone, RussoundClient
 
 _LOGGER = logging.getLogger(__package__)
 
 
 async def demo(loop: AbstractEventLoop, host: str) -> None:
     conn_handler = RussoundTcpConnectionHandler(loop, host, 4999)
-    rus = Russound(conn_handler)
+    rus = RussoundClient(conn_handler)
     await rus.connect()
     _LOGGER.info("Supported Features:")
     for flag in rus.supported_features:

@@ -47,7 +47,7 @@ class RussoundClient:
         self._callbacks: dict[str, list[Any]] = {}
         self._watched_devices: dict[str, bool] = {}
         self._controllers: dict[int, Controller] = {}
-        self.sources: dict[int, Zone] = {}
+        self.sources: dict[int, Source] = {}
         self.rio_version: str | None = None
 
     def _retrieve_cached_variable(self, device_str: str, key: str) -> str:
