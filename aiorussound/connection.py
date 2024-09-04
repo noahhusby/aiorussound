@@ -127,6 +127,7 @@ class RussoundTcpConnectionHandler(RussoundConnectionHandler):
         queue_future = ensure_future(self._cmd_queue.get())
         net_future = ensure_future(reader.readline())
         keep_alive_task = asyncio.create_task(self._keep_alive())
+        last_command_future = None
 
         try:
             _LOGGER.debug("Starting IO loop")
@@ -138,36 +139,26 @@ class RussoundTcpConnectionHandler(RussoundConnectionHandler):
                 if net_future in done:
                     response = net_future.result()
                     try:
-                        response_str = str(response, "utf-8").strip()
+                        ty, value = _process_response(response)
+                        response_str = str(response, encoding="utf-8").strip()
                         if response_str:
                             self._on_msg_recv(response_str)
-                    except CommandError:
+                        if ty == "S" and last_command_future:
+                            last_command_future.set_result(value)
+                            last_command_future = None
+                    except CommandError as e:
+                        if last_command_future:
+                            last_command_future.set_exception(e)
+                            last_command_future = None
                         pass
                     net_future = ensure_future(reader.readline())
 
-                if queue_future in done:
+                if queue_future in done and not last_command_future:
                     cmd, future = queue_future.result()
-                    cmd += "\r"
-                    writer.write(bytearray(cmd, "utf-8"))
+                    writer.write(bytearray(f"{cmd}\r", "utf-8"))
                     await writer.drain()
-
+                    last_command_future = future
                     queue_future = ensure_future(self._cmd_queue.get())
-
-                    while True:
-                        response = await net_future
-                        net_future = ensure_future(reader.readline())
-                        try:
-                            ty, value = _process_response(response)
-                            # TODO: Merge functions to remove complexity
-                            response_str = str(response, "utf-8").strip()
-                            if response_str:
-                                self._on_msg_recv(response_str)
-                            if ty == "S":
-                                future.set_result(value)
-                                break
-                        except CommandError as e:
-                            future.set_exception(e)
-                            break
         except asyncio.CancelledError:
             _LOGGER.debug("IO loop cancelled")
             self._set_connected(False)

@@ -46,10 +46,10 @@ async def demo(loop: AbstractEventLoop, host: str) -> None:
             _LOGGER.info("%s: %s", zone_id, zone.name)
 
 
-        for _ in range(5):
-            con: Zone = c.zones.get(1)
-            await con.volume_up()
-            await asyncio.sleep(1.0)
+        # for _ in range(5):
+        #     con: Zone = c.zones.get(1)
+        #     await con.volume_up()
+        #     await asyncio.sleep(1.0)
 
     while True:
         await asyncio.sleep(1)
