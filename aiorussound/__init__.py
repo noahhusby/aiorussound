@@ -1,11 +1,11 @@
 """Asynchronous Python client for Russound RIO."""
-from .connection import RussoundTcpConnectionHandler
 from .exceptions import (
     CommandError,
     UncachedVariableError,
     UnsupportedFeatureError,
     UnsupportedRussoundVersionError,
 )
+from .connection import RussoundTcpConnectionHandler
 from .models import SourceProperties, ZoneProperties, RussoundMessage
 from .rio import Controller, RussoundClient, Source, Zone
 
