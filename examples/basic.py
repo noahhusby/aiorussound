@@ -9,6 +9,8 @@ import os
 # is used for tests.
 import sys
 
+from aiorussound.connection import RussoundTcpConnectionHandler
+
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), ".."))
 
 from aiorussound import Russound, Zone
@@ -17,7 +19,8 @@ _LOGGER = logging.getLogger(__package__)
 
 
 async def demo(loop: AbstractEventLoop, host: str) -> None:
-    rus = Russound(loop, host)
+    conn_handler = RussoundTcpConnectionHandler(loop, host, 4999)
+    rus = Russound(conn_handler)
     await rus.connect()
     _LOGGER.info("Supported Features:")
     for flag in rus.supported_features:
@@ -43,10 +46,10 @@ async def demo(loop: AbstractEventLoop, host: str) -> None:
             _LOGGER.info("%s: %s", zone_id, zone.name)
 
 
-        for _ in range(5):
-            con: Zone = c.zones.get(1)
-            await con.volume_up()
-            await asyncio.sleep(1.0)
+        # for _ in range(5):
+        #     con: Zone = c.zones.get(1)
+        #     await con.volume_up()
+        #     await asyncio.sleep(1.0)
 
     while True:
         await asyncio.sleep(1)

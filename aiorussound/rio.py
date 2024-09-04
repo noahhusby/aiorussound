@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
-from asyncio import AbstractEventLoop, Future, Queue, StreamReader, StreamWriter
 import logging
 from typing import Any, Coroutine
 
+from aiorussound.connection import RussoundConnectionHandler
 from aiorussound.const import (
-    DEFAULT_PORT,
     FLAGS_BY_VERSION,
     MAX_SOURCE,
     MINIMUM_API_SUPPORT,
-    RECONNECT_DELAY,
-    RESPONSE_REGEX,
     SOURCE_PROPERTIES,
     ZONE_PROPERTIES,
     FeatureFlag,
@@ -23,6 +19,7 @@ from aiorussound.exceptions import (
     UncachedVariableError,
     UnsupportedFeatureError,
 )
+from aiorussound.models import RussoundMessage
 from aiorussound.util import (
     controller_device_str,
     get_max_zones,
@@ -32,12 +29,6 @@ from aiorussound.util import (
     zone_device_str,
 )
 
-# Maintain compat with various 3.x async changes
-if hasattr(asyncio, "ensure_future"):
-    ensure_future = asyncio.ensure_future
-else:
-    ensure_future = getattr(asyncio, "async")
-
 _LOGGER = logging.getLogger(__package__)
 
 
@@ -45,25 +36,19 @@ class Russound:
     """Manages the RIO connection to a Russound device."""
 
     def __init__(
-            self, loop: AbstractEventLoop, host: str, port: int = DEFAULT_PORT
+            self, connection_handler: RussoundConnectionHandler
     ) -> None:
         """Initialize the Russound object using the event loop, host and port
         provided.
         """
-        self._loop = loop
-        self.host = host
-        self.port = port
-        self._ioloop_future = None
-        self._cmd_queue: Queue = Queue()
+        self.connection_handler = connection_handler
+        self.connection_handler.add_message_callback(self._on_msg_recv)
         self._state: dict[str, dict[str, str]] = {}
         self._callbacks: dict[str, list[Any]] = {}
-        self._connection_callbacks: list[Any] = []
-        self._connection_started: bool = False
         self._watched_devices: dict[str, bool] = {}
         self._controllers: dict[int, Controller] = {}
         self.sources: dict[int, Zone] = {}
         self.rio_version: str | None = None
-        self.connected: bool = False
 
     def _retrieve_cached_variable(self, device_str: str, key: str) -> str:
         """Retrieve the cache state of the named variable for a particular
@@ -97,111 +82,18 @@ class Russound:
                         for callback in self._callbacks.get(zone.device_str(), []):
                             callback(device_str, key, value)
 
-    def _process_response(self, res: bytes) -> [str, str]:
-        s = str(res, "utf-8").strip()
-        if not s:
-            return None, None
-        ty, payload = s[0], s[2:]
-        if ty == "E":
-            _LOGGER.debug("Device responded with error: %s", payload)
-            raise CommandError(payload)
-
-        m = RESPONSE_REGEX.match(payload)
-        if not m:
-            return ty, None
-
-        p = m.groupdict()
-        if p["source"]:
-            source_id = int(p["source"])
+    def _on_msg_recv(self, msg: RussoundMessage) -> None:
+        if msg.source:
+            source_id = int(msg.source)
             self._store_cached_variable(
-                source_device_str(source_id), p["variable"], p["value"]
+                source_device_str(source_id), msg.variable, msg.value
             )
-        elif p["zone"]:
-            controller_id = int(p["controller"])
-            zone_id = int(p["zone"])
+        elif msg.zone:
+            controller_id = int(msg.controller)
+            zone_id = int(msg.zone)
             self._store_cached_variable(
-                zone_device_str(controller_id, zone_id), p["variable"], p["value"]
+                zone_device_str(controller_id, zone_id), msg.variable, msg.value
             )
-
-        return ty, p["value"] or p["value_only"]
-
-    async def _keep_alive(self) -> None:
-        while True:
-            await asyncio.sleep(900)  # 15 minutes
-            _LOGGER.debug("Sending keep alive to device")
-            await self.send_cmd("VERSION")
-
-    async def _ioloop(
-            self, reader: StreamReader, writer: StreamWriter, reconnect: bool
-    ) -> None:
-        queue_future = ensure_future(self._cmd_queue.get())
-        net_future = ensure_future(reader.readline())
-        keep_alive_task = asyncio.create_task(self._keep_alive())
-
-        try:
-            _LOGGER.debug("Starting IO loop")
-            while True:
-                done, _ = await asyncio.wait(
-                    [queue_future, net_future], return_when=asyncio.FIRST_COMPLETED
-                )
-
-                if net_future in done:
-                    response = net_future.result()
-                    try:
-                        self._process_response(response)
-                    except CommandError:
-                        pass
-                    net_future = ensure_future(reader.readline())
-
-                if queue_future in done:
-                    cmd, future = queue_future.result()
-                    cmd += "\r"
-                    writer.write(bytearray(cmd, "utf-8"))
-                    await writer.drain()
-
-                    queue_future = ensure_future(self._cmd_queue.get())
-
-                    while True:
-                        response = await net_future
-                        net_future = ensure_future(reader.readline())
-                        try:
-                            ty, value = self._process_response(response)
-                            if ty == "S":
-                                future.set_result(value)
-                                break
-                        except CommandError as e:
-                            future.set_exception(e)
-                            break
-        except asyncio.CancelledError:
-            _LOGGER.debug("IO loop cancelled")
-            self._set_connected(False)
-            raise
-        except asyncio.TimeoutError:
-            _LOGGER.warning("Connection to Russound client timed out")
-        except ConnectionResetError:
-            _LOGGER.warning("Connection to Russound client reset")
-        except Exception:
-            _LOGGER.exception("Unhandled exception in IO loop")
-            self._set_connected(False)
-            raise
-        finally:
-            _LOGGER.debug("Cancelling all tasks...")
-            writer.close()
-            queue_future.cancel()
-            net_future.cancel()
-            keep_alive_task.cancel()
-            self._set_connected(False)
-            if reconnect and self._connection_started:
-                _LOGGER.info("Retrying connection to Russound client in 5s")
-                await asyncio.sleep(RECONNECT_DELAY)
-                await self.connect(reconnect)
-
-    async def send_cmd(self, cmd: str) -> str:
-        """Send a command to the Russound client."""
-        _LOGGER.debug("Sending command '%s' to Russound client", cmd)
-        future: Future = Future()
-        await self._cmd_queue.put((cmd, future))
-        return await future
 
     def add_callback(self, device_str: str, callback) -> None:
         """Register a callback to be called whenever a device variable changes.
@@ -216,53 +108,28 @@ class Russound:
         for callbacks in self._callbacks.values():
             callbacks.remove(callback)
 
-    def add_connection_callback(self, callback) -> None:
-        """Register a callback to be called whenever the instance is connected/disconnected.
-        The callback will be passed one argument: connected: bool.
-        """
-        self._connection_callbacks.append(callback)
-
-    def remove_connection_callback(self, callback) -> None:
-        """Removes a previously registered callback."""
-        self._connection_callbacks.remove(callback)
-
-    def _set_connected(self, connected: bool):
-        self.connected = connected
-        for callback in self._connection_callbacks:
-            callback(connected)
-
     async def connect(self, reconnect=True) -> None:
         """Connect to the controller and start processing responses."""
-        self._connection_started = True
-        _LOGGER.info("Connecting to %s:%s", self.host, self.port)
-        reader, writer = await asyncio.open_connection(self.host, self.port)
-        self._ioloop_future = ensure_future(self._ioloop(reader, writer, reconnect))
-        self.rio_version = await self.send_cmd("VERSION")
+        await self.connection_handler.connect(reconnect=reconnect)
+        self.rio_version = await self.connection_handler.send("VERSION")
         if not is_fw_version_higher(self.rio_version, MINIMUM_API_SUPPORT):
+            await self.connection_handler.close()
             raise UnsupportedFeatureError(
                 f"Russound RIO API v{self.rio_version} is not supported. The minimum "
                 f"supported version is v{MINIMUM_API_SUPPORT}"
             )
         _LOGGER.info("Connected (Russound RIO v%s})", self.rio_version)
         await self._watch_cached_devices()
-        self._set_connected(True)
 
     async def close(self) -> None:
         """Disconnect from the controller."""
-        self._connection_started = False
-        _LOGGER.info("Closing connection to %s:%s", self.host, self.port)
-        self._ioloop_future.cancel()
-        try:
-            await self._ioloop_future
-        except asyncio.CancelledError:
-            pass
-        self._set_connected(False)
+        await self.connection_handler.close()
 
     async def set_variable(
             self, device_str: str, key: str, value: str
     ) -> Coroutine[Any, Any, str]:
         """Set a zone variable to a new value."""
-        return self.send_cmd(f'SET {device_str}.{key}="{value}"')
+        return self.connection_handler.send(f'SET {device_str}.{key}="{value}"')
 
     async def get_variable(self, device_str: str, key: str) -> str:
         """Retrieve the current value of a zone variable.  If the variable is
@@ -272,7 +139,7 @@ class Russound:
         try:
             return self._retrieve_cached_variable(device_str, key)
         except UncachedVariableError:
-            return await self.send_cmd(f"GET {device_str}.{key}")
+            return await self.connection_handler.send(f"GET {device_str}.{key}")
 
     def get_cached_variable(self, device_str: str, key: str, default=None) -> str:
         """Retrieve the current value of a zone variable from the cache or
@@ -335,12 +202,12 @@ class Russound:
     async def watch(self, device_str: str) -> str:
         """Watch a device."""
         self._watched_devices[device_str] = True
-        return await self.send_cmd(f"WATCH {device_str} ON")
+        return await self.connection_handler.send(f"WATCH {device_str} ON")
 
     async def unwatch(self, device_str: str) -> str:
         """Unwatch a device."""
         del self._watched_devices[device_str]
-        return await self.send_cmd(f"WATCH {device_str} OFF")
+        return await self.connection_handler.send(f"WATCH {device_str} OFF")
 
     async def _watch_cached_devices(self) -> None:
         _LOGGER.debug("Watching cached devices")
@@ -498,7 +365,7 @@ class Zone:
     async def send_event(self, event_name, *args) -> str:
         """Send an event to a zone."""
         cmd = f"EVENT {self.device_str()}!{event_name} {" ".join(str(x) for x in args)}"
-        return await self.instance.send_cmd(cmd)
+        return await self.instance.connection_handler.send(cmd)
 
     def _get(self, variable, default=None) -> str:
         return self.instance.get_cached_variable(self.device_str(), variable, default)
@@ -712,7 +579,7 @@ class Source:
         cmd = (
             f"EVENT {self.device_str()}!{event_name} %{" ".join(str(x) for x in args)}"
         )
-        return await self.instance.send_cmd(cmd)
+        return await self.instance.connection_handler.send(cmd)
 
     def _get(self, variable: str) -> str:
         return self.instance.get_cached_variable(self.device_str(), variable)
