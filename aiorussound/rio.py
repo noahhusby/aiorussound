@@ -2,19 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
-from asyncio import AbstractEventLoop, Future, Queue, StreamReader, StreamWriter
 import logging
 from typing import Any, Coroutine
 
 from aiorussound.connection import RussoundConnectionHandler
 from aiorussound.const import (
-    DEFAULT_PORT,
     FLAGS_BY_VERSION,
     MAX_SOURCE,
     MINIMUM_API_SUPPORT,
-    RECONNECT_DELAY,
-    RESPONSE_REGEX,
     SOURCE_PROPERTIES,
     ZONE_PROPERTIES,
     FeatureFlag,
@@ -24,6 +19,7 @@ from aiorussound.exceptions import (
     UncachedVariableError,
     UnsupportedFeatureError,
 )
+from aiorussound.models import RussoundMessage
 from aiorussound.util import (
     controller_device_str,
     get_max_zones,
@@ -32,7 +28,6 @@ from aiorussound.util import (
     source_device_str,
     zone_device_str,
 )
-
 
 _LOGGER = logging.getLogger(__package__)
 
@@ -87,27 +82,17 @@ class Russound:
                         for callback in self._callbacks.get(zone.device_str(), []):
                             callback(device_str, key, value)
 
-    def _on_msg_recv(self, msg: str) -> None:
-        ty, payload = msg[0], msg[2:]
-        if ty == "E":
-            _LOGGER.debug("Device responded with error: %s", payload)
-            raise CommandError(payload)
-
-        m = RESPONSE_REGEX.match(payload)
-        if not m:
-            return
-
-        p = m.groupdict()
-        if p["source"]:
-            source_id = int(p["source"])
+    def _on_msg_recv(self, msg: RussoundMessage) -> None:
+        if msg.source:
+            source_id = int(msg.source)
             self._store_cached_variable(
-                source_device_str(source_id), p["variable"], p["value"]
+                source_device_str(source_id), msg.variable, msg.value
             )
-        elif p["zone"]:
-            controller_id = int(p["controller"])
-            zone_id = int(p["zone"])
+        elif msg.zone:
+            controller_id = int(msg.controller)
+            zone_id = int(msg.zone)
             self._store_cached_variable(
-                zone_device_str(controller_id, zone_id), p["variable"], p["value"]
+                zone_device_str(controller_id, zone_id), msg.variable, msg.value
             )
 
     def add_callback(self, device_str: str, callback) -> None:

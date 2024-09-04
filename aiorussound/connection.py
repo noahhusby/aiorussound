@@ -2,10 +2,11 @@ import asyncio
 import logging
 from abc import abstractmethod
 from asyncio import AbstractEventLoop, Queue, StreamReader, StreamWriter, Future
-from typing import Any
+from typing import Any, Optional
 
 from aiorussound import CommandError
 from aiorussound.const import DEFAULT_PORT, RECONNECT_DELAY, RESPONSE_REGEX
+from aiorussound.models import RussoundMessage
 
 _LOGGER = logging.getLogger(__package__)
 
@@ -16,20 +17,26 @@ else:
     ensure_future = getattr(asyncio, "async")
 
 
-def _process_response(res: bytes) -> [str, str]:
-    s = str(res, "utf-8").strip()
-    if not s:
-        return None, None
-    ty, payload = s[0], s[2:]
-    if ty == "E":
+def _process_response(res: bytes) -> Optional[RussoundMessage]:
+    """Process an incoming string of bytes into a RussoundMessage"""
+    try:
+        # Attempt to decode in Latin and re-encode in UTF-8 to support international characters
+        str_res = res.decode(encoding="iso-8859-1").encode(encoding="utf-8").decode(encoding="utf-8").strip()
+    except UnicodeDecodeError as e:
+        _LOGGER.warning("Failed to decode Russound response %s", res, e)
+        return None
+    if not str_res:
+        return None
+    tag, payload = str_res[0], str_res[2:]
+    if tag == "E":
         _LOGGER.debug("Device responded with error: %s", payload)
         raise CommandError(payload)
-
-    m = RESPONSE_REGEX.match(payload)
+    m = RESPONSE_REGEX.match(payload.strip())
     if not m:
-        return ty, None
+        return RussoundMessage(tag, None, None, None, None, None)
     p = m.groupdict()
-    return ty, p["value"] or p["value_only"]
+    value = p["value"] or p["value_only"]
+    return RussoundMessage(tag, p["variable"], value, p["zone"], p["controller"], p["source"])
 
 
 class RussoundConnectionHandler:
@@ -87,7 +94,7 @@ class RussoundConnectionHandler:
         """Removes a previously registered callback."""
         self._message_callback.remove(callback)
 
-    def _on_msg_recv(self, msg: str) -> None:
+    def _on_msg_recv(self, msg: RussoundMessage) -> None:
         for callback in self._message_callback:
             callback(msg)
 
@@ -139,18 +146,16 @@ class RussoundTcpConnectionHandler(RussoundConnectionHandler):
                 if net_future in done:
                     response = net_future.result()
                     try:
-                        ty, value = _process_response(response)
-                        response_str = str(response, encoding="utf-8").strip()
-                        if response_str:
-                            self._on_msg_recv(response_str)
-                        if ty == "S" and last_command_future:
-                            last_command_future.set_result(value)
-                            last_command_future = None
+                        msg = _process_response(response)
+                        if msg:
+                            self._on_msg_recv(msg)
+                            if msg.tag == "S" and last_command_future:
+                                last_command_future.set_result(msg.value)
+                                last_command_future = None
                     except CommandError as e:
                         if last_command_future:
                             last_command_future.set_exception(e)
                             last_command_future = None
-                        pass
                     net_future = ensure_future(reader.readline())
 
                 if queue_future in done and not last_command_future:
