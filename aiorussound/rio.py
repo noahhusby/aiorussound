@@ -32,7 +32,7 @@ from aiorussound.util import (
 _LOGGER = logging.getLogger(__package__)
 
 
-class Russound:
+class RussoundClient:
     """Manages the RIO connection to a Russound device."""
 
     def __init__(
@@ -238,7 +238,7 @@ class Controller:
 
     def __init__(
             self,
-            instance: Russound,
+            instance: RussoundClient,
             parent_controller: Controller,
             controller_id: int,
             mac_address: str,
@@ -307,7 +307,7 @@ class Zone:
     """
 
     def __init__(
-            self, instance: Russound, controller: Controller, zone_id: int, name: str
+            self, instance: RussoundClient, controller: Controller, zone_id: int, name: str
     ) -> None:
         """Initialize a zone object."""
         self.instance = instance
@@ -440,7 +440,7 @@ class Source:
     """Uniquely identifies a Source."""
 
     def __init__(
-            self, instance: Russound, source_id: int, name: str
+            self, instance: RussoundClient, source_id: int, name: str
     ) -> None:
         """Initialize a Source."""
         self.instance = instance
