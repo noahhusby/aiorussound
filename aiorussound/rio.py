@@ -19,7 +19,7 @@ from aiorussound.exceptions import (
     UncachedVariableError,
     UnsupportedFeatureError,
 )
-from aiorussound.models import RussoundMessage
+from aiorussound.models import RussoundMessage, ZoneProperties, SourceProperties
 from aiorussound.util import (
     controller_device_str,
     get_max_zones,
@@ -130,6 +130,10 @@ class Russound:
     ) -> Coroutine[Any, Any, str]:
         """Set a zone variable to a new value."""
         return self.connection_handler.send(f'SET {device_str}.{key}="{value}"')
+
+    def get_cache(self, device_str: str) -> dict:
+        """Retrieve the cache for a given device by its device string."""
+        return self._state.get(device_str, {})
 
     async def get_variable(self, device_str: str, key: str) -> str:
         """Retrieve the current value of a zone variable.  If the variable is
@@ -370,96 +374,14 @@ class Zone:
     def _get(self, variable, default=None) -> str:
         return self.instance.get_cached_variable(self.device_str(), variable, default)
 
-    @property
-    def current_source(self) -> str:
-        """Return the current source."""
-        # Default to one if not available at the present time
-        return self._get("currentSource", "1")
-
     def fetch_current_source(self) -> Zone:
         """Return the current source as a source object."""
-        current_source = int(self.current_source)
+        current_source = int(self.properties.current_source)
         return self.instance.sources[current_source]
 
     @property
-    def volume(self) -> str:
-        """Return the current volume."""
-        return self._get("volume", "0")
-
-    @property
-    def bass(self) -> str:
-        """Return the current bass."""
-        return self._get("bass")
-
-    @property
-    def treble(self) -> str:
-        """Return the current treble."""
-        return self._get("treble")
-
-    @property
-    def balance(self) -> str:
-        """Return the current balance."""
-        return self._get("balance")
-
-    @property
-    def loudness(self) -> str:
-        """Return the current loudness."""
-        return self._get("loudness")
-
-    @property
-    def turn_on_volume(self) -> str:
-        """Return the current turn on the volume."""
-        return self._get("turnOnVolume")
-
-    @property
-    def do_not_disturb(self) -> str:
-        """Return the current do-not-disturb."""
-        return self._get("doNotDisturb")
-
-    @property
-    def party_mode(self) -> str:
-        """Return the current party mode."""
-        return self._get("partyMode")
-
-    @property
-    def status(self) -> str:
-        """Return the current status of the zone."""
-        return self._get("status", "OFF")
-
-    @property
-    def is_mute(self) -> str:
-        """Return whether the zone is muted or not."""
-        return self._get("mute")
-
-    @property
-    def shared_source(self) -> str:
-        """Return the current shared source."""
-        return self._get("sharedSource")
-
-    @property
-    def last_error(self) -> str:
-        """Return the last error."""
-        return self._get("lastError")
-
-    @property
-    def page(self) -> str:
-        """Return the current page."""
-        return self._get("page")
-
-    @property
-    def sleep_time_default(self) -> str:
-        """Return the current sleep time in seconds."""
-        return self._get("sleepTimeDefault")
-
-    @property
-    def sleep_time_remaining(self) -> str:
-        """Return the current sleep time remaining in seconds."""
-        return self._get("sleepTimeRemaining")
-
-    @property
-    def enabled(self) -> str:
-        """Return whether the zone is enabled."""
-        return self._get("enabled")
+    def properties(self) -> ZoneProperties:
+        return ZoneProperties.from_dict(self.instance.get_cache(self.device_str()))
 
     async def mute(self) -> str:
         """Mute the zone."""
@@ -585,101 +507,6 @@ class Source:
         return self.instance.get_cached_variable(self.device_str(), variable)
 
     @property
-    def type(self) -> str:
-        """Get the type of the source."""
-        return self._get("type")
+    def properties(self) -> SourceProperties:
+        return SourceProperties.from_dict(self.instance.get_cache(self.device_str()))
 
-    @property
-    def channel(self) -> str:
-        """Get the channel of the source."""
-        return self._get("channel")
-
-    @property
-    def cover_art_url(self) -> str:
-        """Get the cover art url of the source."""
-        return self._get("coverArtURL")
-
-    @property
-    def channel_name(self) -> str:
-        """Get the current channel name of the source."""
-        return self._get("channelName")
-
-    @property
-    def genre(self) -> str:
-        """Get the current genre of the source."""
-        return self._get("genre")
-
-    @property
-    def artist_name(self) -> str:
-        """Get the current artist of the source."""
-        return self._get("artistName")
-
-    @property
-    def album_name(self) -> str:
-        """Get the current album of the source."""
-        return self._get("albumName")
-
-    @property
-    def playlist_name(self) -> str:
-        """Get the current playlist of the source."""
-        return self._get("playlistName")
-
-    @property
-    def song_name(self) -> str:
-        """Get the current song of the source."""
-        return self._get("songName")
-
-    @property
-    def program_service_name(self) -> str:
-        """Get the current program service name."""
-        return self._get("programServiceName")
-
-    @property
-    def radio_text(self) -> str:
-        """Get the current radio text of the source."""
-        return self._get("radioText")
-
-    @property
-    def shuffle_mode(self) -> str:
-        """Get the current shuffle mode of the source."""
-        return self._get("shuffleMode")
-
-    @property
-    def repeat_mode(self) -> str:
-        """Get the current repeat mode of the source."""
-        return self._get("repeatMode")
-
-    @property
-    def mode(self) -> str:
-        """Get the current mode of the source."""
-        return self._get("mode")
-
-    @property
-    def play_status(self) -> str:
-        """Get the current play status of the source."""
-        return self._get("playStatus")
-
-    @property
-    def sample_rate(self) -> str:
-        """Get the current sample rate of the source."""
-        return self._get("sampleRate")
-
-    @property
-    def bit_rate(self) -> str:
-        """Get the current bit rate of the source."""
-        return self._get("bitRate")
-
-    @property
-    def bit_depth(self) -> str:
-        """Get the current bit depth of the source."""
-        return self._get("bitDepth")
-
-    @property
-    def play_time(self) -> str:
-        """Get the current play time of the source."""
-        return self._get("playTime")
-
-    @property
-    def track_time(self) -> str:
-        """Get the current track time of the source."""
-        return self._get("trackTime")

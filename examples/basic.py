@@ -45,11 +45,10 @@ async def demo(loop: AbstractEventLoop, host: str) -> None:
             await zone.watch()
             _LOGGER.info("%s: %s", zone_id, zone.name)
 
+        await asyncio.sleep(3.0)
+        for source_id, source in rus.sources.items():
+            print(source.properties)
 
-        # for _ in range(5):
-        #     con: Zone = c.zones.get(1)
-        #     await con.volume_up()
-        #     await asyncio.sleep(1.0)
 
     while True:
         await asyncio.sleep(1)
