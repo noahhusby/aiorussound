@@ -374,7 +374,7 @@ class Zone:
     def _get(self, variable, default=None) -> str:
         return self.instance.get_cached_variable(self.device_str(), variable, default)
 
-    def fetch_current_source(self) -> Zone:
+    def fetch_current_source(self) -> Source:
         """Return the current source as a source object."""
         current_source = int(self.properties.current_source)
         return self.instance.sources[current_source]
