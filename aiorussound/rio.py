@@ -13,13 +13,14 @@ from aiorussound.const import (
     SOURCE_PROPERTIES,
     ZONE_PROPERTIES,
     FeatureFlag,
+    SYSTEM_VARIABLES,
 )
 from aiorussound.exceptions import (
     CommandError,
     UncachedVariableError,
     UnsupportedFeatureError,
 )
-from aiorussound.models import RussoundMessage, ZoneProperties, SourceProperties
+from aiorussound.models import RussoundMessage, ZoneProperties, SourceProperties, RussoundFavorite
 from aiorussound.util import (
     controller_device_str,
     get_max_zones,
@@ -36,7 +37,7 @@ class RussoundClient:
     """Manages the RIO connection to a Russound device."""
 
     def __init__(
-            self, connection_handler: RussoundConnectionHandler
+                self, connection_handler: RussoundConnectionHandler
     ) -> None:
         """Initialize the Russound object using the event loop, host and port
         provided.
@@ -49,6 +50,7 @@ class RussoundClient:
         self._controllers: dict[int, Controller] = {}
         self.sources: dict[int, Source] = {}
         self.rio_version: str | None = None
+        self.last_json = None
 
     def _retrieve_cached_variable(self, device_str: str, key: str) -> str:
         """Retrieve the cache state of the named variable for a particular
@@ -83,6 +85,9 @@ class RussoundClient:
                             callback(device_str, key, value)
 
     def _on_msg_recv(self, msg: RussoundMessage) -> None:
+        if msg.json:
+            self.last_json = msg.json
+
         if msg.source:
             source_id = int(msg.source)
             self._store_cached_variable(
@@ -94,6 +99,8 @@ class RussoundClient:
             self._store_cached_variable(
                 zone_device_str(controller_id, zone_id), msg.variable, msg.value
             )
+        elif msg.variable:
+            self._store_cached_variable(SYSTEM_VARIABLES, msg.variable, msg.value)
 
     def add_callback(self, device_str: str, callback) -> None:
         """Register a callback to be called whenever a device variable changes.
@@ -126,7 +133,7 @@ class RussoundClient:
         await self.connection_handler.close()
 
     async def set_variable(
-            self, device_str: str, key: str, value: str
+        self, device_str: str, key: str, value: str
     ) -> Coroutine[Any, Any, str]:
         """Set a zone variable to a new value."""
         return self.connection_handler.send(f'SET {device_str}.{key}="{value}"')
@@ -173,7 +180,7 @@ class RussoundClient:
                     pass
                 firmware_version = None
                 if is_feature_supported(
-                        self.rio_version, FeatureFlag.PROPERTY_FIRMWARE_VERSION
+                    self.rio_version, FeatureFlag.PROPERTY_FIRMWARE_VERSION
                 ):
                     firmware_version = await self.get_variable(
                         device_str, "firmwareVersion"
@@ -232,18 +239,105 @@ class RussoundClient:
             except CommandError:
                 break
 
+    async def enumerate_zone_favorites(self, zone: Zone) -> list[RussoundFavorite]:
+        """Return a list of RussoundFavorite for this zone."""
+        favorites = []
+
+        for favorite_id in range(1, 2):
+            try:
+                valid = await self.get_variable(
+                    zone.device_str(), f"favorite[{favorite_id}].valid"
+                )
+                if valid == "TRUE":
+                    try:
+                        name = await self.get_variable(
+                            zone.device_str(), f"favorite[{favorite_id}].name"
+                        )
+                        providerMode = await self.get_variable(
+                            zone.device_str(), f"favorite[{favorite_id}].providerMode"
+                        )
+                        albumCoverURL = await self.get_variable(
+                            zone.device_str(), f"favorite[{favorite_id}].albumCoverURL"
+                        )
+                        source_id = await self.get_variable(
+                            zone.device_str(), f"favorite[{favorite_id}].source"
+                        )
+
+                        favorites.append(
+                            RussoundFavorite(
+                                favorite_id,
+                                False,
+                                name,
+                                providerMode,
+                                albumCoverURL,
+                                source_id,
+                            )
+                        )
+                    except CommandError:
+                        break
+            except CommandError:
+                continue
+        return favorites
+
+    async def enumerate_system_favorites(self) -> list[RussoundFavorite]:
+        """Return a list of RussoundFavorite for this system."""
+        favorites = []
+
+        for favorite_id in range(1, 32):
+            try:
+                valid = await self._get_system_favorite_variable(favorite_id, "valid")
+                if valid == "TRUE":
+                    try:
+                        name = await self._get_system_favorite_variable(
+                            favorite_id, "name"
+                        )
+                        providerMode = await self._get_system_favorite_variable(
+                            favorite_id, "providerMode"
+                        )
+                        albumCoverURL = await self._get_system_favorite_variable(
+                            favorite_id, "albumCoverURL"
+                        )
+                        source_id = await self._get_system_favorite_variable(
+                            favorite_id, "source"
+                        )
+
+                        favorites.append(
+                            RussoundFavorite(
+                                favorite_id,
+                                True,
+                                name,
+                                providerMode,
+                                albumCoverURL,
+                                source_id,
+                            )
+                        )
+                    except CommandError:
+                        break
+            except CommandError:
+                continue
+        return favorites
+
+    async def _get_system_favorite_variable(self, favorite_id, variable) -> str:
+        """Return a system favorite variable."""
+        try:
+            return await self.get_variable(
+                SYSTEM_VARIABLES, f"favorite[{favorite_id}].{variable}"
+            )
+        except UncachedVariableError:
+            return "False"
+
 
 class Controller:
     """Uniquely identifies a controller."""
 
     def __init__(
-            self,
-            instance: RussoundClient,
-            parent_controller: Controller,
-            controller_id: int,
-            mac_address: str,
-            controller_type: str,
-            firmware_version: str,
+        self,
+        instance: RussoundClient,
+        parent_controller: Controller,
+        controller_id: int,
+        mac_address: str,
+        controller_type: str,
+        firmware_version: str,
     ) -> None:
         """Initialize the controller."""
         self.instance = instance
@@ -266,8 +360,8 @@ class Controller:
     def __eq__(self, other: object) -> bool:
         """Equality check."""
         return (
-                hasattr(other, "controller_id")
-                and other.controller_id == self.controller_id
+            hasattr(other, "controller_id")
+            and other.controller_id == self.controller_id
         )
 
     def __hash__(self) -> int:
@@ -307,7 +401,7 @@ class Zone:
     """
 
     def __init__(
-            self, instance: RussoundClient, controller: Controller, zone_id: int, name: str
+        self, instance: RussoundClient, controller: Controller, zone_id: int, name: str
     ) -> None:
         """Initialize a zone object."""
         self.instance = instance
@@ -330,10 +424,10 @@ class Zone:
     def __eq__(self, other: object) -> bool:
         """Equality check."""
         return (
-                hasattr(other, "zone_id")
-                and hasattr(other, "controller")
-                and other.zone_id == self.zone_id
-                and other.controller == self.controller
+            hasattr(other, "zone_id")
+            and hasattr(other, "controller")
+            and other.zone_id == self.zone_id
+            and other.controller == self.controller
         )
 
     def __hash__(self) -> int:
@@ -440,7 +534,7 @@ class Source:
     """Uniquely identifies a Source."""
 
     def __init__(
-            self, instance: RussoundClient, source_id: int, name: str
+                self, instance: RussoundClient, source_id: int, name: str
     ) -> None:
         """Initialize a Source."""
         self.instance = instance
@@ -466,7 +560,7 @@ class Source:
                 and other.source_id == self.source_id
         )
 
-    def __hash__(self) -> int:
+        def __hash__(self) -> int:
         """Hash the current configuration of the source."""
         return hash(str(self))
 

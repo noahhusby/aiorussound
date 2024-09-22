@@ -15,6 +15,8 @@ TIMEOUT = 5.0
 
 MAX_SOURCE = 17
 
+SYSTEM_VARIABLES = "System"
+
 RESPONSE_REGEX = re.compile(
     r"^(?:C\[(?P<controller>\d+)](?:\.Z\[(?P<zone>\d+)])?|S\[(?P<source>\d+)])?\."
     r"(?P<variable>\S+)=\s*\"(?P<value>.*)\"$|^(?P<variable_only>\S+)=\s*\"(?P<value_only>.*)\"$"
@@ -154,7 +156,19 @@ FLAGS_BY_VERSION = {
 
 VERSIONS_BY_FLAGS = defaultdict(list)
 
-ZONE_PROPERTIES: list[str] = ["currentSource"]
+ZONE_PROPERTIES: list[str] = [
+    "currentSource",
+    "favorite[1].valid",
+    "favorite[1].name",
+    "favorite[1].providerMode",
+    "favorite[1].albumCoverURL",
+    "favorite[1].source",
+    "favorite[2].valid",
+    "favorite[2].name",
+    "favorite[2].providerMode",
+    "favorite[2].albumCoverURL",
+    "favorite[2].source",
+]
 
 SOURCE_PROPERTIES: list[str] = []
 

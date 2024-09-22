@@ -7,6 +7,18 @@ from mashumaro.mixins.orjson import DataClassORJSONMixin
 
 
 @dataclass
+class RussoundFavorite:
+    """Russound Favorite."""
+
+    favorite_id: int
+    issystemfavorite: bool
+    name: str
+    providermode: str
+    albumcoverurl: str
+    source_id: int
+
+
+@dataclass
 class RussoundMessage:
     """Incoming russound message."""
     tag: str
@@ -15,6 +27,7 @@ class RussoundMessage:
     zone: Optional[str] = None
     controller: Optional[str] = None
     source: Optional[str] = None
+    json: Optional[str] = None
 
 
 @dataclass
