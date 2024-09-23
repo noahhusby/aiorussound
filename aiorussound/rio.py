@@ -50,7 +50,6 @@ class RussoundClient:
         self._controllers: dict[int, Controller] = {}
         self.sources: dict[int, Source] = {}
         self.rio_version: str | None = None
-        self.last_json = None
 
     def _retrieve_cached_variable(self, device_str: str, key: str) -> str:
         """Retrieve the cache state of the named variable for a particular
@@ -85,9 +84,6 @@ class RussoundClient:
                             callback(device_str, key, value)
 
     def _on_msg_recv(self, msg: RussoundMessage) -> None:
-        if msg.json:
-            self.last_json = msg.json
-
         if msg.source:
             source_id = int(msg.source)
             self._store_cached_variable(
