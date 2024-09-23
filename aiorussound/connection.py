@@ -33,7 +33,7 @@ def _process_response(res: bytes) -> Optional[RussoundMessage]:
         raise CommandError(payload)
     m = RESPONSE_REGEX.match(payload.strip())
     if not m:
-        return RussoundMessage(tag, None, None, None, None, None, None)
+        return RussoundMessage(tag, None, None, None, None, None)
     p = m.groupdict()
     value = p["value"] or p["value_only"]
     variable = p["variable"] or p["variable_only"]
