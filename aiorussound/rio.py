@@ -37,7 +37,7 @@ class RussoundClient:
     """Manages the RIO connection to a Russound device."""
 
     def __init__(
-                self, connection_handler: RussoundConnectionHandler
+            self, connection_handler: RussoundConnectionHandler
     ) -> None:
         """Initialize the Russound object using the event loop, host and port
         provided.
@@ -129,7 +129,7 @@ class RussoundClient:
         await self.connection_handler.close()
 
     async def set_variable(
-        self, device_str: str, key: str, value: str
+            self, device_str: str, key: str, value: str
     ) -> Coroutine[Any, Any, str]:
         """Set a zone variable to a new value."""
         return self.connection_handler.send(f'SET {device_str}.{key}="{value}"')
@@ -176,7 +176,7 @@ class RussoundClient:
                     pass
                 firmware_version = None
                 if is_feature_supported(
-                    self.rio_version, FeatureFlag.PROPERTY_FIRMWARE_VERSION
+                        self.rio_version, FeatureFlag.PROPERTY_FIRMWARE_VERSION
                 ):
                     firmware_version = await self.get_variable(
                         device_str, "firmwareVersion"
@@ -327,13 +327,13 @@ class Controller:
     """Uniquely identifies a controller."""
 
     def __init__(
-        self,
-        instance: RussoundClient,
-        parent_controller: Controller,
-        controller_id: int,
-        mac_address: str,
-        controller_type: str,
-        firmware_version: str,
+            self,
+            instance: RussoundClient,
+            parent_controller: Controller,
+            controller_id: int,
+            mac_address: str,
+            controller_type: str,
+            firmware_version: str,
     ) -> None:
         """Initialize the controller."""
         self.instance = instance
