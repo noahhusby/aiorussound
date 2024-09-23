@@ -7,14 +7,14 @@ from mashumaro.mixins.orjson import DataClassORJSONMixin
 
 
 @dataclass
-class RussoundFavorite:
+class Favorite:
     """Russound Favorite."""
 
     favorite_id: int
-    issystemfavorite: bool
+    is_system_favorite: bool
     name: str
-    providermode: str
-    albumcoverurl: str
+    provider_mode: str
+    album_cover_url: str
     source_id: int
 
 

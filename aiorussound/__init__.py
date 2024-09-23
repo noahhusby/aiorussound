@@ -6,7 +6,7 @@ from .exceptions import (
     UnsupportedRussoundVersionError,
 )
 from .connection import RussoundTcpConnectionHandler
-from .models import SourceProperties, ZoneProperties, RussoundMessage
+from .models import SourceProperties, ZoneProperties, RussoundMessage, Favorite
 from .rio import Controller, RussoundClient, Source, Zone
 
 __all__ = [
@@ -21,5 +21,6 @@ __all__ = [
     "RussoundTcpConnectionHandler",
     "ZoneProperties",
     "SourceProperties",
-    "RussoundMessage"
+    "RussoundMessage",
+    "Favorite"
 ]

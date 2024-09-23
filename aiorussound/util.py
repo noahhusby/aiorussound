@@ -69,3 +69,12 @@ def get_max_zones(model: str) -> int:
     if model in ("MCA-66", "MCA-C3"):
         return 6
     return 1
+
+
+def get_max_zones_favorites(model: str) -> int:
+    """Return a maximum number of zones favorites supported by a specific controller."""
+    if model in ("MCA-88", "MCA-88X", "MCA-C5", "MCA-66", "MCA-C3"):
+        return 4
+    if model in ("XSource", "XZone4", "XZone70V"):
+        return 2
+    return 0
