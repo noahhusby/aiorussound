@@ -35,16 +35,13 @@ def _process_response(res: bytes) -> Optional[RussoundMessage]:
     m = RESPONSE_REGEX.match(payload.strip())
 
     if not m:
-        if payload.endswith("}"):
-            return RussoundMessage(tag, None, None, None, None, None, str_res)
-        else:
-            return RussoundMessage(tag, None, None, None, None, None, None)
+        return RussoundMessage(tag, None, None, None, None, None)
 
     p = m.groupdict()
     value = p["value"] or p["value_only"]
     variable = p["variable"] or p["variable_only"]
 
-    return RussoundMessage(tag, variable, value, p["zone"], p["controller"], p["source"], None    )
+    return RussoundMessage(tag, variable, value, p["zone"], p["controller"], p["source"])
 
 
 class RussoundConnectionHandler:
