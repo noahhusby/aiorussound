@@ -130,7 +130,7 @@ class RussoundTcpConnectionHandler(RussoundConnectionHandler):
         self._set_connected(False)
 
     async def _ioloop(
-        self, reader: StreamReader, writer: StreamWriter, reconnect: bool
+            self, reader: StreamReader, writer: StreamWriter, reconnect: bool
     ) -> None:
         queue_future = ensure_future(self._cmd_queue.get())
         net_future = ensure_future(reader.readline())

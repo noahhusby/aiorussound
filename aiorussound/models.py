@@ -27,7 +27,6 @@ class RussoundMessage:
     zone: Optional[str] = None
     controller: Optional[str] = None
     source: Optional[str] = None
-    json: Optional[str] = None
 
 
 @dataclass

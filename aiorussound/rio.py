@@ -39,7 +39,7 @@ class RussoundClient:
     """Manages the RIO connection to a Russound device."""
 
     def __init__(
-                self, connection_handler: RussoundConnectionHandler
+            self, connection_handler: RussoundConnectionHandler
     ) -> None:
         """Initialize the Russound object using the event loop, host and port
         provided.
@@ -52,7 +52,6 @@ class RussoundClient:
         self._controllers: dict[int, Controller] = {}
         self.sources: dict[int, Source] = {}
         self.rio_version: str | None = None
-        self.last_json = None
 
     def _retrieve_cached_variable(self, device_str: str, key: str) -> str:
         """Retrieve the cache state of the named variable for a particular
@@ -87,9 +86,6 @@ class RussoundClient:
                             callback(device_str, key, value)
 
     def _on_msg_recv(self, msg: RussoundMessage) -> None:
-        if msg.json:
-            self.last_json = msg.json
-
         if msg.source:
             source_id = int(msg.source)
             self._store_cached_variable(
@@ -135,7 +131,7 @@ class RussoundClient:
         await self.connection_handler.close()
 
     async def set_variable(
-        self, device_str: str, key: str, value: str
+            self, device_str: str, key: str, value: str
     ) -> Coroutine[Any, Any, str]:
         """Set a zone variable to a new value."""
         return self.connection_handler.send(f'SET {device_str}.{key}="{value}"')
@@ -182,7 +178,7 @@ class RussoundClient:
                     pass
                 firmware_version = None
                 if is_feature_supported(
-                    self.rio_version, FeatureFlag.PROPERTY_FIRMWARE_VERSION
+                        self.rio_version, FeatureFlag.PROPERTY_FIRMWARE_VERSION
                 ):
                     firmware_version = await self.get_variable(
                         device_str, "firmwareVersion"
@@ -335,13 +331,13 @@ class Controller:
     """Uniquely identifies a controller."""
 
     def __init__(
-        self,
-        instance: RussoundClient,
-        parent_controller: Controller,
-        controller_id: int,
-        mac_address: str,
-        controller_type: str,
-        firmware_version: str,
+            self,
+            instance: RussoundClient,
+            parent_controller: Controller,
+            controller_id: int,
+            mac_address: str,
+            controller_type: str,
+            firmware_version: str,
     ) -> None:
         """Initialize the controller."""
         self.instance = instance
@@ -364,8 +360,8 @@ class Controller:
     def __eq__(self, other: object) -> bool:
         """Equality check."""
         return (
-            hasattr(other, "controller_id")
-            and other.controller_id == self.controller_id
+                hasattr(other, "controller_id")
+                and other.controller_id == self.controller_id
         )
 
     def __hash__(self) -> int:
@@ -405,7 +401,7 @@ class Zone:
     """
 
     def __init__(
-        self, instance: RussoundClient, controller: Controller, zone_id: int, name: str
+            self, instance: RussoundClient, controller: Controller, zone_id: int, name: str
     ) -> None:
         """Initialize a zone object."""
         self.instance = instance
@@ -428,10 +424,10 @@ class Zone:
     def __eq__(self, other: object) -> bool:
         """Equality check."""
         return (
-            hasattr(other, "zone_id")
-            and hasattr(other, "controller")
-            and other.zone_id == self.zone_id
-            and other.controller == self.controller
+                hasattr(other, "zone_id")
+                and hasattr(other, "controller")
+                and other.zone_id == self.zone_id
+                and other.controller == self.controller
         )
 
     def __hash__(self) -> int:
@@ -538,7 +534,7 @@ class Source:
     """Uniquely identifies a Source."""
 
     def __init__(
-                self, instance: RussoundClient, source_id: int, name: str
+            self, instance: RussoundClient, source_id: int, name: str
     ) -> None:
         """Initialize a Source."""
         self.instance = instance
@@ -564,7 +560,7 @@ class Source:
                 and other.source_id == self.source_id
         )
 
-        def __hash__(self) -> int:
+    def __hash__(self) -> int:
         """Hash the current configuration of the source."""
         return hash(str(self))
 
