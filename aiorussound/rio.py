@@ -356,8 +356,8 @@ class Controller:
     def __eq__(self, other: object) -> bool:
         """Equality check."""
         return (
-            hasattr(other, "controller_id")
-            and other.controller_id == self.controller_id
+                hasattr(other, "controller_id")
+                and other.controller_id == self.controller_id
         )
 
     def __hash__(self) -> int:
@@ -397,7 +397,7 @@ class Zone:
     """
 
     def __init__(
-        self, instance: RussoundClient, controller: Controller, zone_id: int, name: str
+            self, instance: RussoundClient, controller: Controller, zone_id: int, name: str
     ) -> None:
         """Initialize a zone object."""
         self.instance = instance
@@ -420,10 +420,10 @@ class Zone:
     def __eq__(self, other: object) -> bool:
         """Equality check."""
         return (
-            hasattr(other, "zone_id")
-            and hasattr(other, "controller")
-            and other.zone_id == self.zone_id
-            and other.controller == self.controller
+                hasattr(other, "zone_id")
+                and hasattr(other, "controller")
+                and other.zone_id == self.zone_id
+                and other.controller == self.controller
         )
 
     def __hash__(self) -> int:
@@ -530,7 +530,7 @@ class Source:
     """Uniquely identifies a Source."""
 
     def __init__(
-                self, instance: RussoundClient, source_id: int, name: str
+            self, instance: RussoundClient, source_id: int, name: str
     ) -> None:
         """Initialize a Source."""
         self.instance = instance
@@ -556,7 +556,7 @@ class Source:
                 and other.source_id == self.source_id
         )
 
-        def __hash__(self) -> int:
+    def __hash__(self) -> int:
         """Hash the current configuration of the source."""
         return hash(str(self))
 
