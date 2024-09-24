@@ -363,7 +363,8 @@ class Zone:
 
     async def send_event(self, event_name, *args) -> str:
         """Send an event to a zone."""
-        cmd = f"EVENT {self.device_str()}!{event_name} {" ".join(str(x) for x in args)}"
+        args = " ".join(str(x) for x in args)
+        cmd = f"EVENT {self.device_str()}!{event_name} {args}"
         return await self.client.connection_handler.send(cmd)
 
     def _get(self, variable, default=None) -> str:
