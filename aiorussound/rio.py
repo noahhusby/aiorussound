@@ -339,18 +339,6 @@ class Zone:
         """
         return zone_device_str(self.controller.controller_id, self.zone_id)
 
-    async def watch(self) -> str:
-        """Add a zone to the watchlist.
-        Zones on the watchlist will push all
-        state changes (and those of the source they are currently connected to)
-        back to the client.
-        """
-        return await self.client.watch(self.device_str())
-
-    async def unwatch(self) -> str:
-        """Remove a zone from the watchlist."""
-        return await self.client.unwatch(self.device_str())
-
     async def send_event(self, event_name, *args) -> str:
         """Send an event to a zone."""
         args = " ".join(str(x) for x in args)
@@ -448,27 +436,6 @@ class Source:
         command.
         """
         return source_device_str(self.source_id)
-
-    async def watch(self) -> str:
-        """Add a source to the watchlist.
-        Sources on the watchlist will push all
-        state changes (and those of the source they are currently connected to)
-        back to the client.
-        """
-        return await self.client.watch(self.device_str())
-
-    async def unwatch(self) -> str:
-        """Remove a source from the watchlist."""
-        return await self.client.unwatch(self.device_str())
-
-    async def send_event(self, event_name: str, *args: tuple[str, ...]) -> str:
-        """Send an event to a source."""
-        args = " ".join(str(x) for x in args)
-        cmd = f"EVENT {self.device_str()}!{event_name} %{args}"
-        return await self.client.connection_handler.send(cmd)
-
-    def _get(self, variable: str) -> str:
-        return self.client.get_cached_variable(self.device_str(), variable)
 
     @property
     def properties(self) -> SourceProperties:
