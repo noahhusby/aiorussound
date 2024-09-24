@@ -1,4 +1,6 @@
-"""Asynchronous Python client for Russound RIO."""
+"""
+.. include:: ../README.md
+"""
 
 from .exceptions import (
     CommandError,
