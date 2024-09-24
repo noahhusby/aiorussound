@@ -156,10 +156,6 @@ FLAGS_BY_VERSION = {
 
 VERSIONS_BY_FLAGS = defaultdict(list)
 
-ZONE_PROPERTIES: list[str] = ["currentSource"]
-
-SOURCE_PROPERTIES: list[str] = []
-
 for version, flags in FLAGS_BY_VERSION.items():
     for flag in flags:
         VERSIONS_BY_FLAGS[flag] = version
