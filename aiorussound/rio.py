@@ -237,48 +237,6 @@ class RussoundClient:
             except CommandError:
                 break
 
-    async def enumerate_zone_favorites(self, zone: Zone) -> list[Favorite]:
-        """Return a list of Favorite for this zone."""
-        favorites = []
-        if zone.controller.max_zone_favorites > 0:
-            for favorite_id in range(1, zone.controller.max_zone_favorites):
-                try:
-                    valid = await self.get_variable(
-                        zone.device_str(), f"favorite[{favorite_id}].valid"
-                    )
-                    if valid == "TRUE":
-                        try:
-                            name = await self.get_variable(
-                                zone.device_str(), f"favorite[{favorite_id}].name"
-                            )
-                            providerMode = await self.get_variable(
-                                zone.device_str(),
-                                f"favorite[{favorite_id}].providerMode",
-                            )
-                            albumCoverURL = await self.get_variable(
-                                zone.device_str(),
-                                f"favorite[{favorite_id}].albumCoverURL",
-                            )
-                            source_id = await self.get_variable(
-                                zone.device_str(), f"favorite[{favorite_id}].source"
-                            )
-
-                            favorites.append(
-                                Favorite(
-                                    favorite_id,
-                                    False,
-                                    name,
-                                    providerMode,
-                                    albumCoverURL,
-                                    source_id,
-                                )
-                            )
-                        except CommandError:
-                            break
-                except CommandError:
-                    continue
-        return favorites
-
     async def enumerate_system_favorites(self) -> list[Favorite]:
         """Return a list of Favorite for this system."""
         favorites = []
@@ -529,6 +487,47 @@ class Zone:
         """Select a source."""
         return await self.send_event("SelectSource", source)
 
+    async def enumerate_favorites(self) -> list[Favorite]:
+        """Return a list of Favorite for this zone."""
+        favorites = []
+        if self.controller.max_zone_favorites > 0:
+            for favorite_id in range(1, self.controller.max_zone_favorites):
+                try:
+                    valid = await self.instance.get_variable(
+                        self.device_str(), f"favorite[{favorite_id}].valid"
+                    )
+                    if valid == "TRUE":
+                        try:
+                            name = await self.instance.get_variable(
+                                self.device_str(), f"favorite[{favorite_id}].name"
+                            )
+                            providerMode = await self.instance.get_variable(
+                                self.device_str(),
+                                f"favorite[{favorite_id}].providerMode",
+                            )
+                            albumCoverURL = await self.instance.get_variable(
+                                self.device_str(),
+                                f"favorite[{favorite_id}].albumCoverURL",
+                            )
+                            source_id = await self.instance.get_variable(
+                                self.device_str(), f"favorite[{favorite_id}].source"
+                            )
+
+                            favorites.append(
+                                Favorite(
+                                    favorite_id,
+                                    False,
+                                    name,
+                                    providerMode,
+                                    albumCoverURL,
+                                    source_id,
+                                )
+                            )
+                        except CommandError:
+                            break
+                except CommandError:
+                    continue
+        return favorites
 
 class Source:
     """Uniquely identifies a Source."""
