@@ -47,7 +47,6 @@ class RussoundClient:
         self.connection_handler.add_message_callback(self._on_msg_recv)
         self._state: dict[str, dict[str, str]] = {}
         self._state_update_callbacks: list[Any] = []
-        self._watched_devices: dict[str, bool] = {}
         self._controllers: dict[int, Controller] = {}
         self.sources: dict[int, Source] = {}
         self.rio_version: str | None = None
@@ -128,7 +127,6 @@ class RussoundClient:
                 f"supported version is v{MINIMUM_API_SUPPORT}"
             )
         _LOGGER.info("Connected (Russound RIO v%s})", self.rio_version)
-        await self._watch_cached_devices()
 
     async def close(self) -> None:
         """Disconnect from the controller."""
@@ -214,18 +212,11 @@ class RussoundClient:
 
     async def watch(self, device_str: str) -> str:
         """Watch a device."""
-        self._watched_devices[device_str] = True
         return await self.connection_handler.send(f"WATCH {device_str} ON")
 
     async def unwatch(self, device_str: str) -> str:
         """Unwatch a device."""
-        del self._watched_devices[device_str]
         return await self.connection_handler.send(f"WATCH {device_str} OFF")
-
-    async def _watch_cached_devices(self) -> None:
-        _LOGGER.debug("Watching cached devices")
-        for device in self._watched_devices.keys():
-            await self.watch(device)
 
     async def init_sources(self) -> None:
         """Return a list of (zone_id, zone) tuples."""
@@ -236,7 +227,6 @@ class RussoundClient:
                 name = await self.get_variable(device_str, "name")
                 if name:
                     source = Source(self, source_id, name)
-                    await source.fetch_configuration()
                     self.sources[source_id] = source
             except CommandError:
                 break
@@ -292,7 +282,6 @@ class Controller:
                 name = await self.client.get_variable(device_str, "name")
                 if name:
                     zone = Zone(self.client, self, zone_id, name)
-                    await zone.fetch_configuration()
                     self.zones[zone_id] = zone
 
             except CommandError:
