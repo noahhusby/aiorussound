@@ -481,9 +481,8 @@ class Source:
 
     async def send_event(self, event_name: str, *args: tuple[str, ...]) -> str:
         """Send an event to a source."""
-        cmd = (
-            f"EVENT {self.device_str()}!{event_name} %{" ".join(str(x) for x in args)}"
-        )
+        args = " ".join(str(x) for x in args)
+        cmd = f"EVENT {self.device_str()}!{event_name} %{args}"
         return await self.client.connection_handler.send(cmd)
 
     def _get(self, variable: str) -> str:
