@@ -13,7 +13,7 @@ from aiorussound.connection import RussoundTcpConnectionHandler
 
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), ".."))
 
-from aiorussound import Zone, RussoundClient
+from aiorussound import RussoundClient
 
 _LOGGER = logging.getLogger(__package__)
 
@@ -48,7 +48,6 @@ async def demo(loop: AbstractEventLoop, host: str) -> None:
         await asyncio.sleep(3.0)
         for source_id, source in rus.sources.items():
             print(source.properties)
-
 
     while True:
         await asyncio.sleep(1)

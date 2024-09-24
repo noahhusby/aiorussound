@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Coroutine
 
@@ -19,7 +20,12 @@ from aiorussound.exceptions import (
     UncachedVariableError,
     UnsupportedFeatureError,
 )
-from aiorussound.models import RussoundMessage, ZoneProperties, SourceProperties
+from aiorussound.models import (
+    RussoundMessage,
+    ZoneProperties,
+    SourceProperties,
+    CallbackType,
+)
 from aiorussound.util import (
     controller_device_str,
     get_max_zones,
@@ -35,20 +41,45 @@ _LOGGER = logging.getLogger(__package__)
 class RussoundClient:
     """Manages the RIO connection to a Russound device."""
 
-    def __init__(
-            self, connection_handler: RussoundConnectionHandler
-    ) -> None:
+    def __init__(self, connection_handler: RussoundConnectionHandler) -> None:
         """Initialize the Russound object using the event loop, host and port
         provided.
         """
         self.connection_handler = connection_handler
         self.connection_handler.add_message_callback(self._on_msg_recv)
         self._state: dict[str, dict[str, str]] = {}
-        self._callbacks: dict[str, list[Any]] = {}
+        self._state_update_callbacks: list[Any] = []
         self._watched_devices: dict[str, bool] = {}
         self._controllers: dict[int, Controller] = {}
         self.sources: dict[int, Source] = {}
         self.rio_version: str | None = None
+
+    async def register_state_update_callbacks(self, callback: Any):
+        """Register state update callback."""
+        self._state_update_callbacks.append(callback)
+        await callback(self, CallbackType.STATE)
+
+    def unregister_state_update_callbacks(self, callback: Any):
+        """Unregister state update callback."""
+        if callback in self._state_update_callbacks:
+            self._state_update_callbacks.remove(callback)
+
+    def clear_state_update_callbacks(self):
+        """Clear state update callbacks."""
+        self._state_update_callbacks.clear()
+
+    async def do_state_update_callbacks(
+        self, callback_type: CallbackType = CallbackType.STATE
+    ):
+        """Call state update callbacks."""
+        if not self._state_update_callbacks:
+            return
+        callbacks = set()
+        for callback in self._state_update_callbacks:
+            callbacks.add(callback(self, callback_type))
+
+        if callbacks:
+            await asyncio.gather(*callbacks)
 
     def _retrieve_cached_variable(self, device_str: str, key: str) -> str:
         """Retrieve the cache state of the named variable for a particular
@@ -62,7 +93,9 @@ class RussoundClient:
         except KeyError:
             raise UncachedVariableError
 
-    def _store_cached_variable(self, device_str: str, key: str, value: str) -> None:
+    async def _store_cached_variable(
+        self, device_str: str, key: str, value: str
+    ) -> None:
         """Store the current known value of a device variable into the cache.
         Calls any device callbacks.
         """
@@ -71,42 +104,20 @@ class RussoundClient:
         zone_state[key] = value
         _LOGGER.debug("Cache store %s.%s = %s", device_str, key, value)
         # Handle callbacks
-        for callback in self._callbacks.get(device_str, []):
-            callback(device_str, key, value)
-        # Handle source callback
-        if device_str[0] == "S":
-            for controller in self._controllers.values():
-                for zone in controller.zones.values():
-                    source = zone.fetch_current_source()
-                    if source and source.device_str() == device_str:
-                        for callback in self._callbacks.get(zone.device_str(), []):
-                            callback(device_str, key, value)
+        await self.do_state_update_callbacks()
 
-    def _on_msg_recv(self, msg: RussoundMessage) -> None:
+    async def _on_msg_recv(self, msg: RussoundMessage) -> None:
         if msg.source:
             source_id = int(msg.source)
-            self._store_cached_variable(
+            await self._store_cached_variable(
                 source_device_str(source_id), msg.variable, msg.value
             )
         elif msg.zone:
             controller_id = int(msg.controller)
             zone_id = int(msg.zone)
-            self._store_cached_variable(
+            await self._store_cached_variable(
                 zone_device_str(controller_id, zone_id), msg.variable, msg.value
             )
-
-    def add_callback(self, device_str: str, callback) -> None:
-        """Register a callback to be called whenever a device variable changes.
-        The callback will be passed three arguments: the device_str, the variable
-        name and the variable value.
-        """
-        callbacks = self._callbacks.setdefault(device_str, [])
-        callbacks.append(callback)
-
-    def remove_callback(self, callback) -> None:
-        """Remove a previously registered callback."""
-        for callbacks in self._callbacks.values():
-            callbacks.remove(callback)
 
     async def connect(self, reconnect=True) -> None:
         """Connect to the controller and start processing responses."""
@@ -126,7 +137,7 @@ class RussoundClient:
         await self.connection_handler.close()
 
     async def set_variable(
-            self, device_str: str, key: str, value: str
+        self, device_str: str, key: str, value: str
     ) -> Coroutine[Any, Any, str]:
         """Set a zone variable to a new value."""
         return self.connection_handler.send(f'SET {device_str}.{key}="{value}"')
@@ -173,7 +184,7 @@ class RussoundClient:
                     pass
                 firmware_version = None
                 if is_feature_supported(
-                        self.rio_version, FeatureFlag.PROPERTY_FIRMWARE_VERSION
+                    self.rio_version, FeatureFlag.PROPERTY_FIRMWARE_VERSION
                 ):
                     firmware_version = await self.get_variable(
                         device_str, "firmwareVersion"
@@ -237,13 +248,13 @@ class Controller:
     """Uniquely identifies a controller."""
 
     def __init__(
-            self,
-            instance: RussoundClient,
-            parent_controller: Controller,
-            controller_id: int,
-            mac_address: str,
-            controller_type: str,
-            firmware_version: str,
+        self,
+        instance: RussoundClient,
+        parent_controller: Controller,
+        controller_id: int,
+        mac_address: str,
+        controller_type: str,
+        firmware_version: str,
     ) -> None:
         """Initialize the controller."""
         self.instance = instance
@@ -266,8 +277,8 @@ class Controller:
     def __eq__(self, other: object) -> bool:
         """Equality check."""
         return (
-                hasattr(other, "controller_id")
-                and other.controller_id == self.controller_id
+            hasattr(other, "controller_id")
+            and other.controller_id == self.controller_id
         )
 
     def __hash__(self) -> int:
@@ -289,14 +300,6 @@ class Controller:
             except CommandError:
                 break
 
-    def add_callback(self, callback) -> None:
-        """Add a callback function to be called when a zone is changed."""
-        self.instance.add_callback(controller_device_str(self.controller_id), callback)
-
-    def remove_callback(self, callback) -> None:
-        """Remove a callback function to be called when a zone is changed."""
-        self.instance.remove_callback(callback)
-
 
 class Zone:
     """Uniquely identifies a zone
@@ -307,7 +310,7 @@ class Zone:
     """
 
     def __init__(
-            self, instance: RussoundClient, controller: Controller, zone_id: int, name: str
+        self, instance: RussoundClient, controller: Controller, zone_id: int, name: str
     ) -> None:
         """Initialize a zone object."""
         self.instance = instance
@@ -330,10 +333,10 @@ class Zone:
     def __eq__(self, other: object) -> bool:
         """Equality check."""
         return (
-                hasattr(other, "zone_id")
-                and hasattr(other, "controller")
-                and other.zone_id == self.zone_id
-                and other.controller == self.controller
+            hasattr(other, "zone_id")
+            and hasattr(other, "controller")
+            and other.zone_id == self.zone_id
+            and other.controller == self.controller
         )
 
     def __hash__(self) -> int:
@@ -357,14 +360,6 @@ class Zone:
     async def unwatch(self) -> str:
         """Remove a zone from the watchlist."""
         return await self.instance.unwatch(self.device_str())
-
-    def add_callback(self, callback) -> None:
-        """Adds a callback function to be called when a zone is changed."""
-        self.instance.add_callback(self.device_str(), callback)
-
-    def remove_callback(self, callback) -> None:
-        """Remove a zone from the watchlist."""
-        self.instance.remove_callback(callback)
 
     async def send_event(self, event_name, *args) -> str:
         """Send an event to a zone."""
@@ -439,9 +434,7 @@ class Zone:
 class Source:
     """Uniquely identifies a Source."""
 
-    def __init__(
-            self, instance: RussoundClient, source_id: int, name: str
-    ) -> None:
+    def __init__(self, instance: RussoundClient, source_id: int, name: str) -> None:
         """Initialize a Source."""
         self.instance = instance
         self.source_id = int(source_id)
@@ -461,10 +454,7 @@ class Source:
 
     def __eq__(self, other: object) -> bool:
         """Equality check."""
-        return (
-                hasattr(other, "source_id")
-                and other.source_id == self.source_id
-        )
+        return hasattr(other, "source_id") and other.source_id == self.source_id
 
     def __hash__(self) -> int:
         """Hash the current configuration of the source."""
@@ -475,14 +465,6 @@ class Source:
         command.
         """
         return source_device_str(self.source_id)
-
-    def add_callback(self, callback: Any) -> None:
-        """Add a callback function to the zone."""
-        self.instance.add_callback(self.device_str(), callback)
-
-    def remove_callback(self, callback: Any) -> None:
-        """Remove a callback from the source."""
-        self.instance.remove_callback(callback)
 
     async def watch(self) -> str:
         """Add a source to the watchlist.
@@ -509,4 +491,3 @@ class Source:
     @property
     def properties(self) -> SourceProperties:
         return SourceProperties.from_dict(self.instance.get_cache(self.device_str()))
-
