@@ -5,7 +5,12 @@ from asyncio import AbstractEventLoop, Queue, StreamReader, StreamWriter, Future
 from typing import Any, Optional
 
 from aiorussound import CommandError
-from aiorussound.const import DEFAULT_PORT, RECONNECT_DELAY, RESPONSE_REGEX
+from aiorussound.const import (
+    DEFAULT_PORT,
+    RECONNECT_DELAY,
+    RESPONSE_REGEX,
+    KEEP_ALIVE_INTERVAL,
+)
 from aiorussound.models import RussoundMessage
 
 _LOGGER = logging.getLogger(__package__)
@@ -61,6 +66,8 @@ class RussoundConnectionHandler:
 
     async def send(self, cmd: str) -> str:
         """Send a command to the Russound client."""
+        if not self.connected:
+            raise CommandError("Not connected to device.")
         _LOGGER.debug("Sending command '%s' to Russound client", cmd)
         future: Future = Future()
         await self._cmd_queue.put((cmd, future))
@@ -72,7 +79,7 @@ class RussoundConnectionHandler:
 
     async def _keep_alive(self) -> None:
         while True:
-            await asyncio.sleep(900)  # 15 minutes
+            await asyncio.sleep(KEEP_ALIVE_INTERVAL)  # 15 minutes
             _LOGGER.debug("Sending keep alive to device")
             await self.send("VERSION")
 
