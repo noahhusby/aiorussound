@@ -249,7 +249,7 @@ class Controller:
 
     def __init__(
         self,
-        instance: RussoundClient,
+        client: RussoundClient,
         parent_controller: Controller,
         controller_id: int,
         mac_address: str,
@@ -257,7 +257,7 @@ class Controller:
         firmware_version: str,
     ) -> None:
         """Initialize the controller."""
-        self.instance = instance
+        self.client = client
         self.parent_controller = parent_controller
         self.controller_id = controller_id
         self.mac_address = mac_address
@@ -291,9 +291,9 @@ class Controller:
         for zone_id in range(1, self.max_zones + 1):
             try:
                 device_str = zone_device_str(self.controller_id, zone_id)
-                name = await self.instance.get_variable(device_str, "name")
+                name = await self.client.get_variable(device_str, "name")
                 if name:
-                    zone = Zone(self.instance, self, zone_id, name)
+                    zone = Zone(self.client, self, zone_id, name)
                     await zone.fetch_configuration()
                     self.zones[zone_id] = zone
 
@@ -310,10 +310,10 @@ class Zone:
     """
 
     def __init__(
-        self, instance: RussoundClient, controller: Controller, zone_id: int, name: str
+        self, client: RussoundClient, controller: Controller, zone_id: int, name: str
     ) -> None:
         """Initialize a zone object."""
-        self.instance = instance
+        self.client = client
         self.controller = controller
         self.zone_id = int(zone_id)
         self.name = name
@@ -322,7 +322,7 @@ class Zone:
         """Fetches zone configuration from controller."""
         for prop in ZONE_PROPERTIES:
             try:
-                await self.instance.get_variable(self.device_str(), prop)
+                await self.client.get_variable(self.device_str(), prop)
             except CommandError:
                 continue
 
@@ -355,28 +355,28 @@ class Zone:
         state changes (and those of the source they are currently connected to)
         back to the client.
         """
-        return await self.instance.watch(self.device_str())
+        return await self.client.watch(self.device_str())
 
     async def unwatch(self) -> str:
         """Remove a zone from the watchlist."""
-        return await self.instance.unwatch(self.device_str())
+        return await self.client.unwatch(self.device_str())
 
     async def send_event(self, event_name, *args) -> str:
         """Send an event to a zone."""
         cmd = f"EVENT {self.device_str()}!{event_name} {" ".join(str(x) for x in args)}"
-        return await self.instance.connection_handler.send(cmd)
+        return await self.client.connection_handler.send(cmd)
 
     def _get(self, variable, default=None) -> str:
-        return self.instance.get_cached_variable(self.device_str(), variable, default)
+        return self.client.get_cached_variable(self.device_str(), variable, default)
 
     def fetch_current_source(self) -> Source:
         """Return the current source as a source object."""
         current_source = int(self.properties.current_source)
-        return self.instance.sources[current_source]
+        return self.client.sources[current_source]
 
     @property
     def properties(self) -> ZoneProperties:
-        return ZoneProperties.from_dict(self.instance.get_cache(self.device_str()))
+        return ZoneProperties.from_dict(self.client.get_cache(self.device_str()))
 
     async def mute(self) -> str:
         """Mute the zone."""
@@ -434,9 +434,9 @@ class Zone:
 class Source:
     """Uniquely identifies a Source."""
 
-    def __init__(self, instance: RussoundClient, source_id: int, name: str) -> None:
+    def __init__(self, client: RussoundClient, source_id: int, name: str) -> None:
         """Initialize a Source."""
-        self.instance = instance
+        self.client = client
         self.source_id = int(source_id)
         self.name = name
 
@@ -444,7 +444,7 @@ class Source:
         """Fetch the current configuration of the source."""
         for prop in SOURCE_PROPERTIES:
             try:
-                await self.instance.get_variable(self.device_str(), prop)
+                await self.client.get_variable(self.device_str(), prop)
             except CommandError:
                 continue
 
@@ -472,22 +472,22 @@ class Source:
         state changes (and those of the source they are currently connected to)
         back to the client.
         """
-        return await self.instance.watch(self.device_str())
+        return await self.client.watch(self.device_str())
 
     async def unwatch(self) -> str:
         """Remove a source from the watchlist."""
-        return await self.instance.unwatch(self.device_str())
+        return await self.client.unwatch(self.device_str())
 
     async def send_event(self, event_name: str, *args: tuple[str, ...]) -> str:
         """Send an event to a source."""
         cmd = (
             f"EVENT {self.device_str()}!{event_name} %{" ".join(str(x) for x in args)}"
         )
-        return await self.instance.connection_handler.send(cmd)
+        return await self.client.connection_handler.send(cmd)
 
     def _get(self, variable: str) -> str:
-        return self.instance.get_cached_variable(self.device_str(), variable)
+        return self.client.get_cached_variable(self.device_str(), variable)
 
     @property
     def properties(self) -> SourceProperties:
-        return SourceProperties.from_dict(self.instance.get_cache(self.device_str()))
+        return SourceProperties.from_dict(self.client.get_cache(self.device_str()))
