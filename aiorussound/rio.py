@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Coroutine
+from asyncio import Future, Task, AbstractEventLoop
+from typing import Any, Coroutine, Optional
 
 from aiorussound.connection import RussoundConnectionHandler
 from aiorussound.const import (
@@ -12,11 +13,13 @@ from aiorussound.const import (
     MAX_SOURCE,
     MINIMUM_API_SUPPORT,
     FeatureFlag,
+    MAX_RNET_CONTROLLERS,
 )
 from aiorussound.exceptions import (
     CommandError,
     UncachedVariableError,
     UnsupportedFeatureError,
+    RussoundError,
 )
 from aiorussound.models import (
     RussoundMessage,
@@ -31,6 +34,7 @@ from aiorussound.util import (
     is_fw_version_higher,
     source_device_str,
     zone_device_str,
+    is_rnet_capable,
 )
 
 _LOGGER = logging.getLogger(__package__)
@@ -45,9 +49,13 @@ class RussoundClient:
         """
         self.connection_handler = connection_handler
         self.connection_handler.add_message_callback(self._on_msg_recv)
+        self._loop: AbstractEventLoop = asyncio.get_running_loop()
+        self._subscriptions: dict[str, Any] = {}
+        self.connect_result: Future | None = None
+        self.connect_task: Task | None = None
         self._state: dict[str, dict[str, str]] = {}
         self._state_update_callbacks: list[Any] = []
-        self._controllers: dict[int, Controller] = {}
+        self.controllers: dict[int, Controller] = {}
         self.sources: dict[int, Source] = {}
         self.rio_version: str | None = None
 
@@ -116,9 +124,21 @@ class RussoundClient:
                 zone_device_str(controller_id, zone_id), msg.variable, msg.value
             )
 
-    async def connect(self, reconnect=True) -> None:
+    async def connect(self) -> None:
         """Connect to the controller and start processing responses."""
-        await self.connection_handler.connect(reconnect=reconnect)
+        if not self.is_connected():
+            self.connect_result = self._loop.create_future()
+            self.connect_task = asyncio.create_task(
+                self.connect_handler(self.connect_result)
+            )
+        return await self.connect_result
+
+    def is_connected(self) -> bool:
+        """Return True if device is connected."""
+        return self.connect_task is not None and not self.connect_task.done()
+
+    async def connect_handler(self, res):
+        await self.connection_handler.connect(reconnect=True)
         self.rio_version = await self.connection_handler.send("VERSION")
         if not is_fw_version_higher(self.rio_version, MINIMUM_API_SUPPORT):
             await self.connection_handler.close()
@@ -127,6 +147,50 @@ class RussoundClient:
                 f"supported version is v{MINIMUM_API_SUPPORT}"
             )
         _LOGGER.info("Connected (Russound RIO v%s})", self.rio_version)
+
+        # Fetch parent controller
+        parent_controller = await self._get_controller(1)
+        if not parent_controller:
+            raise RussoundError("No primary controller found.")
+        self.controllers[1] = parent_controller
+
+        # Only search for daisy-chained controllers if the parent supports RNET
+        if is_rnet_capable(parent_controller.controller_type):
+            for controller_id in range(2, MAX_RNET_CONTROLLERS + 1):
+                controller = await self._get_controller(controller_id)
+                if controller:
+                    self.controllers[controller_id] = controller
+
+        # Load source structure
+        for source_id in range(1, MAX_SOURCE):
+            try:
+                device_str = source_device_str(source_id)
+                name = await self.get_variable(device_str, "name")
+                if name:
+                    source = Source(self, source_id, name)
+                    self.sources[source_id] = source
+            except CommandError:
+                break
+
+        subscribe_state_updates = {self.subscribe(self._async_handle_system, "System")}
+        subscribe_tasks = set()
+        for state_update in subscribe_state_updates:
+            subscribe_tasks.add(asyncio.create_task(state_update))
+        await asyncio.wait(subscribe_tasks)
+
+        res.set_result(True)
+
+    async def subscribe(self, callback: Any, branch: str) -> None:
+        self._subscriptions[branch] = callback
+        try:
+            await self.connection_handler.send(f"WATCH {branch} ON")
+        except (asyncio.CancelledError, asyncio.TimeoutError, CommandError):
+            del self._subscriptions[branch]
+            raise
+
+    async def _async_handle_system(self, branch: str, value: str) -> None:
+        """Handle async info update."""
+        await self.do_state_update_callbacks()
 
     async def close(self) -> None:
         """Disconnect from the controller."""
@@ -161,44 +225,34 @@ class RussoundClient:
         except UncachedVariableError:
             return default
 
-    async def enumerate_controllers(self) -> dict[int, Controller]:
-        """Return a list of (controller_id,
-        controller_macAddress, controller_type) tuples.
-        """
-        controllers: dict[int, Controller] = {}
-        # Search for first controller, then iterate if RNET is supported
-        for controller_id in range(1, 9):
-            device_str = controller_device_str(controller_id)
+    async def _get_controller(self, controller_id: int) -> Optional[Controller]:
+        device_str = controller_device_str(controller_id)
+        try:
+            controller_type = await self.get_variable(device_str, "type")
+            if not controller_type:
+                return None
+            mac_address = None
             try:
-                controller_type = await self.get_variable(device_str, "type")
-                if not controller_type:
-                    continue
-                mac_address = None
-                try:
-                    mac_address = await self.get_variable(device_str, "macAddress")
-                except CommandError:
-                    pass
-                firmware_version = None
-                if is_feature_supported(
-                    self.rio_version, FeatureFlag.PROPERTY_FIRMWARE_VERSION
-                ):
-                    firmware_version = await self.get_variable(
-                        device_str, "firmwareVersion"
-                    )
-                controller = Controller(
-                    self,
-                    controllers.get(1),
-                    controller_id,
-                    mac_address,
-                    controller_type,
-                    firmware_version,
-                )
-                await controller.fetch_configuration()
-                controllers[controller_id] = controller
+                mac_address = await self.get_variable(device_str, "macAddress")
             except CommandError:
-                continue
-        self._controllers = controllers
-        return controllers
+                pass
+            firmware_version = None
+            if is_feature_supported(
+                self.rio_version, FeatureFlag.PROPERTY_FIRMWARE_VERSION
+            ):
+                firmware_version = await self.get_variable(
+                    device_str, "firmwareVersion"
+                )
+            controller = Controller(
+                self,
+                controller_id,
+                mac_address,
+                controller_type,
+                firmware_version,
+            )
+            return controller
+        except CommandError:
+            return None
 
     @property
     def supported_features(self) -> list[FeatureFlag]:
@@ -218,19 +272,6 @@ class RussoundClient:
         """Unwatch a device."""
         return await self.connection_handler.send(f"WATCH {device_str} OFF")
 
-    async def init_sources(self) -> None:
-        """Return a list of (zone_id, zone) tuples."""
-        self.sources = {}
-        for source_id in range(1, MAX_SOURCE):
-            try:
-                device_str = source_device_str(source_id)
-                name = await self.get_variable(device_str, "name")
-                if name:
-                    source = Source(self, source_id, name)
-                    self.sources[source_id] = source
-            except CommandError:
-                break
-
 
 class Controller:
     """Uniquely identifies a controller."""
@@ -238,7 +279,6 @@ class Controller:
     def __init__(
         self,
         client: RussoundClient,
-        parent_controller: Controller,
         controller_id: int,
         mac_address: str,
         controller_type: str,
@@ -246,7 +286,6 @@ class Controller:
     ) -> None:
         """Initialize the controller."""
         self.client = client
-        self.parent_controller = parent_controller
         self.controller_id = controller_id
         self.mac_address = mac_address
         self.controller_type = controller_type

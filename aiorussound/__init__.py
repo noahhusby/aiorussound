@@ -3,6 +3,7 @@
 """
 
 from .exceptions import (
+    RussoundError,
     CommandError,
     UncachedVariableError,
     UnsupportedFeatureError,
@@ -13,6 +14,7 @@ from .models import SourceProperties, ZoneProperties, RussoundMessage
 from .rio import Controller, RussoundClient, Source, Zone
 
 __all__ = [
+    "RussoundError",
     "CommandError",
     "UnsupportedFeatureError",
     "UnsupportedRussoundVersionError",

@@ -37,6 +37,8 @@ def _process_response(res: bytes) -> Optional[RussoundMessage]:
         return None
     if not str_res:
         return None
+    if len(str_res) == 1 and str_res[0] == "S":
+        return RussoundMessage("S", None, None, None, None, None)
     tag, payload = str_res[0], str_res[2:]
     if tag == "E":
         _LOGGER.debug("Device responded with error: %s", payload)
