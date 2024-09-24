@@ -11,8 +11,6 @@ from aiorussound.const import (
     FLAGS_BY_VERSION,
     MAX_SOURCE,
     MINIMUM_API_SUPPORT,
-    SOURCE_PROPERTIES,
-    ZONE_PROPERTIES,
     FeatureFlag,
 )
 from aiorussound.exceptions import (
@@ -318,14 +316,6 @@ class Zone:
         self.zone_id = int(zone_id)
         self.name = name
 
-    async def fetch_configuration(self) -> None:
-        """Fetches zone configuration from controller."""
-        for prop in ZONE_PROPERTIES:
-            try:
-                await self.client.get_variable(self.device_str(), prop)
-            except CommandError:
-                continue
-
     def __str__(self) -> str:
         """Return a string representation of the zone."""
         return f"{self.controller.mac_address} > Z{self.zone_id}"
@@ -440,14 +430,6 @@ class Source:
         self.client = client
         self.source_id = int(source_id)
         self.name = name
-
-    async def fetch_configuration(self) -> None:
-        """Fetch the current configuration of the source."""
-        for prop in SOURCE_PROPERTIES:
-            try:
-                await self.client.get_variable(self.device_str(), prop)
-            except CommandError:
-                continue
 
     def __str__(self) -> str:
         """Return the current configuration of the source."""
