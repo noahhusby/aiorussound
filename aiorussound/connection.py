@@ -21,7 +21,12 @@ def _process_response(res: bytes) -> Optional[RussoundMessage]:
     """Process an incoming string of bytes into a RussoundMessage"""
     try:
         # Attempt to decode in Latin and re-encode in UTF-8 to support international characters
-        str_res = res.decode(encoding="iso-8859-1").encode(encoding="utf-8").decode(encoding="utf-8").strip()
+        str_res = (
+            res.decode(encoding="iso-8859-1")
+            .encode(encoding="utf-8")
+            .decode(encoding="utf-8")
+            .strip()
+        )
     except UnicodeDecodeError as e:
         _LOGGER.warning("Failed to decode Russound response %s", res, e)
         return None
@@ -36,7 +41,9 @@ def _process_response(res: bytes) -> Optional[RussoundMessage]:
         return RussoundMessage(tag, None, None, None, None, None)
     p = m.groupdict()
     value = p["value"] or p["value_only"]
-    return RussoundMessage(tag, p["variable"], value, p["zone"], p["controller"], p["source"])
+    return RussoundMessage(
+        tag, p["variable"], value, p["zone"], p["controller"], p["source"]
+    )
 
 
 class RussoundConnectionHandler:
@@ -94,14 +101,15 @@ class RussoundConnectionHandler:
         """Removes a previously registered callback."""
         self._message_callback.remove(callback)
 
-    def _on_msg_recv(self, msg: RussoundMessage) -> None:
+    async def _on_msg_recv(self, msg: RussoundMessage) -> None:
         for callback in self._message_callback:
-            callback(msg)
+            await callback(msg)
 
 
 class RussoundTcpConnectionHandler(RussoundConnectionHandler):
-
-    def __init__(self, loop: AbstractEventLoop, host: str, port: int = DEFAULT_PORT) -> None:
+    def __init__(
+        self, loop: AbstractEventLoop, host: str, port: int = DEFAULT_PORT
+    ) -> None:
         """Initialize the Russound object using the event loop, host and port
         provided.
         """
@@ -129,7 +137,7 @@ class RussoundTcpConnectionHandler(RussoundConnectionHandler):
         self._set_connected(False)
 
     async def _ioloop(
-            self, reader: StreamReader, writer: StreamWriter, reconnect: bool
+        self, reader: StreamReader, writer: StreamWriter, reconnect: bool
     ) -> None:
         queue_future = ensure_future(self._cmd_queue.get())
         net_future = ensure_future(reader.readline())
@@ -148,7 +156,7 @@ class RussoundTcpConnectionHandler(RussoundConnectionHandler):
                     try:
                         msg = _process_response(response)
                         if msg:
-                            self._on_msg_recv(msg)
+                            await self._on_msg_recv(msg)
                             if msg.tag == "S" and last_command_future:
                                 last_command_future.set_result(msg.value)
                                 last_command_future = None

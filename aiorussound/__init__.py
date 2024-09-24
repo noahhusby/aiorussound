@@ -1,4 +1,5 @@
 """Asynchronous Python client for Russound RIO."""
+
 from .exceptions import (
     CommandError,
     UncachedVariableError,
@@ -21,5 +22,5 @@ __all__ = [
     "RussoundTcpConnectionHandler",
     "ZoneProperties",
     "SourceProperties",
-    "RussoundMessage"
+    "RussoundMessage",
 ]
