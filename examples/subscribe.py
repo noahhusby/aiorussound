@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from aiorussound import RussoundTcpConnectionHandler, RussoundClient
 from aiorussound.models import CallbackType
@@ -20,12 +21,11 @@ async def main():
 
     await client.register_state_update_callbacks(on_state_change)
     await client.connect()
-    await client.enumerate_controllers()
-    await client.init_sources()
 
     # Play media using the unit's front controls or Russound app
     await asyncio.sleep(60)
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
     asyncio.run(main())

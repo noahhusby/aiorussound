@@ -69,3 +69,8 @@ def get_max_zones(model: str) -> int:
     if model in ("MCA-66", "MCA-C3"):
         return 6
     return 1
+
+
+def is_rnet_capable(model: str) -> bool:
+    """Return whether a controller is rnet capable."""
+    return model in ("MCA-88X", "MCA-88", "MCA-66", "MCA-C5", "MCA-C3")

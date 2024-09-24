@@ -1,6 +1,10 @@
 """Asynchronous Python client for Russound RIO."""
 
 
+class RussoundError(Exception):
+    """A generic error."""
+
+
 class CommandError(Exception):
     """A command sent to the controller caused an error."""
 

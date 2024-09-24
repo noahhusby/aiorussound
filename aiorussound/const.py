@@ -17,6 +17,8 @@ KEEP_ALIVE_INTERVAL = 60
 
 MAX_SOURCE = 17
 
+MAX_RNET_CONTROLLERS = 6
+
 RESPONSE_REGEX = re.compile(
     r"^(?:C\[(?P<controller>\d+)](?:\.Z\[(?P<zone>\d+)])?|S\[(?P<source>\d+)])?\."
     r"(?P<variable>\S+)=\s*\"(?P<value>.*)\"$|^(?P<variable_only>\S+)=\s*\"(?P<value_only>.*)\"$"
