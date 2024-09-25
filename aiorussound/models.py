@@ -9,18 +9,6 @@ from mashumaro.mixins.orjson import DataClassORJSONMixin
 
 
 @dataclass
-class RussoundMessage:
-    """Incoming russound message."""
-
-    tag: str
-    variable: Optional[str] = None
-    value: Optional[str] = None
-    zone: Optional[str] = None
-    controller: Optional[str] = None
-    source: Optional[str] = None
-
-
-@dataclass
 class ZoneProperties(DataClassORJSONMixin):
     """Data class representing Russound state."""
 
@@ -58,9 +46,10 @@ class ZoneProperties(DataClassORJSONMixin):
 
 
 @dataclass
-class SourceProperties(DataClassORJSONMixin):
+class Source(DataClassORJSONMixin):
     """Data class representing Russound source."""
 
+    name: str = field(metadata=field_options(alias="name"), default=None)
     type: str = field(metadata=field_options(alias="type"), default=None)
     channel: str = field(metadata=field_options(alias="channel"), default=None)
     cover_art_url: str = field(
@@ -94,3 +83,21 @@ class CallbackType(StrEnum):
 
     STATE = "state"
     CONNECTION = "connection"
+
+
+class MessageType(StrEnum):
+    """Message type."""
+
+    STATE = "S"
+    NOTIFICATION = "N"
+    ERROR = "E"
+
+
+@dataclass
+class RussoundMessage:
+    """Incoming russound message."""
+
+    type: str
+    branch: Optional[str] = None
+    leaf: Optional[str] = None
+    value: Optional[str] = None

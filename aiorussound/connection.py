@@ -11,7 +11,7 @@ from aiorussound.const import (
     RESPONSE_REGEX,
     KEEP_ALIVE_INTERVAL,
 )
-from aiorussound.models import RussoundMessage
+from aiorussound.models import RussoundMessage, MessageType
 
 _LOGGER = logging.getLogger(__package__)
 
@@ -38,19 +38,15 @@ def _process_response(res: bytes) -> Optional[RussoundMessage]:
     if not str_res:
         return None
     if len(str_res) == 1 and str_res[0] == "S":
-        return RussoundMessage("S", None, None, None, None, None)
+        return RussoundMessage(MessageType.STATE, None, None, None)
     tag, payload = str_res[0], str_res[2:]
     if tag == "E":
         _LOGGER.debug("Device responded with error: %s", payload)
         raise CommandError(payload)
     m = RESPONSE_REGEX.match(payload.strip())
     if not m:
-        return RussoundMessage(tag, None, None, None, None, None)
-    p = m.groupdict()
-    value = p["value"] or p["value_only"]
-    return RussoundMessage(
-        tag, p["variable"], value, p["zone"], p["controller"], p["source"]
-    )
+        return RussoundMessage(tag, None, None, None)
+    return RussoundMessage(tag, m.group(1) or None, m.group(2), m.group(3))
 
 
 class RussoundConnectionHandler:
@@ -166,7 +162,7 @@ class RussoundTcpConnectionHandler(RussoundConnectionHandler):
                         msg = _process_response(response)
                         if msg:
                             await self._on_msg_recv(msg)
-                            if msg.tag == "S" and last_command_future:
+                            if msg.type == "S" and last_command_future:
                                 last_command_future.set_result(msg.value)
                                 last_command_future = None
                     except CommandError as e:
