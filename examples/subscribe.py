@@ -11,6 +11,7 @@ PORT = 4999
 async def on_state_change(client: RussoundClient, callback_type: CallbackType):
     """Called when new information is received."""
     print(f"Callback Type: {callback_type} {client.is_connected()}")
+    print(client.controllers[1].zones[1].status)
 
 
 async def main():
@@ -31,7 +32,7 @@ async def main():
     print(client.state)
 
     # Play media using the unit's front controls or Russound app
-    await asyncio.sleep(20)
+    await asyncio.sleep(30)
     await client.disconnect()
 
 

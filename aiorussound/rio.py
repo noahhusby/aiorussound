@@ -281,11 +281,12 @@ class RussoundClient:
             async for raw_msg in handler.reader:
                 msg = self.process_response(raw_msg)
                 if msg:
-                    if msg.type == "S":
+                    _LOGGER.debug(f"recv ({msg})")
+                    if msg.type == "S" and not self._futures.empty():
                         future: Future = await self._futures.get()
                         if not future.done():
                             future.set_result(msg.value)
-                    elif msg.type == "E":
+                    elif msg.type == "E" and not self._futures.empty():
                         future: Future = await self._futures.get()
                         if not future.done():
                             future.set_exception(CommandError)
