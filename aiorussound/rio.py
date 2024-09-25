@@ -6,6 +6,7 @@ import asyncio
 import logging
 import re
 from asyncio import Future, Task, AbstractEventLoop
+from dataclasses import field, dataclass
 from typing import Any, Coroutine, Optional
 
 from aiorussound.connection import RussoundConnectionHandler
@@ -14,6 +15,7 @@ from aiorussound.const import (
     MAX_SOURCE,
     MINIMUM_API_SUPPORT,
     FeatureFlag,
+    MAX_RNET_CONTROLLERS,
 )
 from aiorussound.exceptions import (
     CommandError,
@@ -22,17 +24,17 @@ from aiorussound.exceptions import (
 )
 from aiorussound.models import (
     RussoundMessage,
-    ZoneProperties,
     CallbackType,
     Source,
+    Zone,
 )
 from aiorussound.util import (
     controller_device_str,
-    get_max_zones,
     is_feature_supported,
     is_fw_version_higher,
     source_device_str,
     zone_device_str,
+    is_rnet_capable,
 )
 
 _LOGGER = logging.getLogger(__package__)
@@ -142,18 +144,18 @@ class RussoundClient:
         _LOGGER.info("Connected (Russound RIO v%s})", self.rio_version)
 
         # Fetch parent controller
-        has_parent_controller = await self._load_controller(1)
-        if not has_parent_controller:
+        parent_controller = await self._load_controller(1)
+        if not parent_controller:
             raise RussoundError("No primary controller found.")
 
-        # self.controllers[1] = parent_controller
+        self.controllers[1] = parent_controller
 
         # Only search for daisy-chained controllers if the parent supports RNET
-        # if is_rnet_capable(parent_controller.controller_type):
-        #     for controller_id in range(2, MAX_RNET_CONTROLLERS + 1):
-        #         controller = await self._get_controller(controller_id)
-        #         if controller:
-        #             self.controllers[controller_id] = controller
+        if is_rnet_capable(parent_controller.controller_type):
+            for controller_id in range(2, MAX_RNET_CONTROLLERS + 1):
+                controller = await self._load_controller(controller_id)
+                if controller:
+                    self.controllers[controller_id] = controller
 
         subscribe_state_updates = {self.subscribe(self._async_handle_system, "System")}
 
@@ -213,7 +215,12 @@ class RussoundClient:
 
     async def _async_handle_zone(self) -> None:
         """Handle async info update."""
-        print("Handle Zone", self.state)
+        for controller_id, controller_data in self.state["C"].items():
+            for zone_id, zone_data in controller_data["Z"].items():
+                zone = ZoneControlSurface.from_dict(zone_data)
+                zone.client = self
+                zone.device_str = zone_device_str(controller_id, zone_id)
+                self.controllers[controller_id].zones[zone_id] = zone
         await self.do_state_update_callbacks()
 
     async def close(self) -> None:
@@ -233,12 +240,12 @@ class RussoundClient:
         """
         return await self.connection_handler.send(f"GET {device_str}.{key}")
 
-    async def _load_controller(self, controller_id: int) -> bool:
+    async def _load_controller(self, controller_id: int) -> Optional[Controller]:
         device_str = controller_device_str(controller_id)
         try:
             controller_type = await self.get_variable(device_str, "type")
             if not controller_type:
-                return False
+                return None
             mac_address = None
             try:
                 mac_address = await self.get_variable(device_str, "macAddress")
@@ -251,14 +258,7 @@ class RussoundClient:
                 firmware_version = await self.get_variable(
                     device_str, "firmwareVersion"
                 )
-            controller_state = self.state.get("C", {})
-            controller_state[controller_id] = {
-                "type": controller_type,
-                "mac_address": mac_address,
-                "firmware_version": firmware_version,
-            }
-            self.state["C"] = controller_state
-            return True
+            return Controller(controller_type, mac_address, firmware_version, {})
         except CommandError:
             return None
 
@@ -273,86 +273,17 @@ class RussoundClient:
         return flags
 
 
-class Controller:
-    """Uniquely identifies a controller."""
-
-    def __init__(
-        self,
-        client: RussoundClient,
-        controller_id: int,
-        mac_address: str,
-        controller_type: str,
-        firmware_version: str,
-    ) -> None:
-        """Initialize the controller."""
-        self.client = client
-        self.controller_id = controller_id
-        self.mac_address = mac_address
-        self.controller_type = controller_type
-        self.firmware_version = firmware_version
-        self.zones: dict[int, Zone] = {}
-        self.max_zones = get_max_zones(controller_type)
-
-    def __str__(self) -> str:
-        """Returns a string representation of the controller."""
-        return f"{self.controller_id}"
-
-    def __eq__(self, other: object) -> bool:
-        """Equality check."""
-        return (
-            hasattr(other, "controller_id")
-            and other.controller_id == self.controller_id
-        )
-
-    def __hash__(self) -> int:
-        """Hashes the controller id."""
-        return hash(str(self))
+class AbstractControlSurface:
+    def __init__(self):
+        self.client: Optional[RussoundClient] = None
+        self.device_str: Optional[str] = None
 
 
-class Zone:
-    """Uniquely identifies a zone
-
-    Russound controllers can be linked together to expand the total zone count.
-    Zones are identified by their zone index (1-N) within the controller they
-    belong to and the controller index (1-N) within the entire system.
-    """
-
-    def __init__(
-        self, client: RussoundClient, controller: Controller, zone_id: int, name: str
-    ) -> None:
-        """Initialize a zone object."""
-        self.client = client
-        self.controller = controller
-        self.zone_id = int(zone_id)
-        self.name = name
-
-    def __str__(self) -> str:
-        """Return a string representation of the zone."""
-        return f"{self.controller.mac_address} > Z{self.zone_id}"
-
-    def __eq__(self, other: object) -> bool:
-        """Equality check."""
-        return (
-            hasattr(other, "zone_id")
-            and hasattr(other, "controller")
-            and other.zone_id == self.zone_id
-            and other.controller == self.controller
-        )
-
-    def __hash__(self) -> int:
-        """Hashes the zone id."""
-        return hash(str(self))
-
-    def device_str(self) -> str:
-        """Generate a string that can be used to reference this zone in a RIO
-        command
-        """
-        return zone_device_str(self.controller.controller_id, self.zone_id)
-
+class ZoneControlSurface(Zone, AbstractControlSurface):
     async def send_event(self, event_name, *args) -> str:
         """Send an event to a zone."""
         args = " ".join(str(x) for x in args)
-        cmd = f"EVENT {self.device_str()}!{event_name} {args}"
+        cmd = f"EVENT {self.device_str}!{event_name} {args}"
         return await self.client.connection_handler.send(cmd)
 
     # def fetch_current_source(self) -> Source:
@@ -413,11 +344,11 @@ class Zone:
         return await self.send_event("SelectSource", source)
 
 
-class AbstractRussoundClientSurface:
-    def __init__(self):
-        self.client: Optional[RussoundClient] = None
+@dataclass
+class Controller:
+    """Data class representing a Russound controller."""
 
-
-class ZoneControlSurface(ZoneProperties, AbstractRussoundClientSurface):
-    async def do_something(self):
-        print(self.client.is_connected())
+    controller_type: str
+    mac_address: Optional[str]
+    firmware_version: Optional[str]
+    zones: dict[int, ZoneControlSurface] = field(default_factory=dict)

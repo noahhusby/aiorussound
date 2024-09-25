@@ -9,9 +9,10 @@ from mashumaro.mixins.orjson import DataClassORJSONMixin
 
 
 @dataclass
-class ZoneProperties(DataClassORJSONMixin):
+class Zone(DataClassORJSONMixin):
     """Data class representing Russound state."""
 
+    name: str = field(metadata=field_options(alias="name"), default=None)
     volume: str = field(metadata=field_options(alias="volume"), default="0")
     bass: str = field(metadata=field_options(alias="bass"), default="0")
     treble: str = field(metadata=field_options(alias="treble"), default="0")

@@ -22,6 +22,14 @@ async def main():
     await client.register_state_update_callbacks(on_state_change)
     await client.connect()
 
+    for s_id, source in client.sources.items():
+        print(f"Found source {s_id} - {source.name}")
+
+    for c_id, controller in client.controllers.items():
+        print(f"Found controller {c_id} - {controller.mac_address}")
+        for z_id, zone in controller.zones.items():
+            print(f"Found zone {z_id} - {zone.name}")
+
     # Play media using the unit's front controls or Russound app
     await asyncio.sleep(60)
 
