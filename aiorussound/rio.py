@@ -33,6 +33,7 @@ from aiorussound.models import (
     Zone,
     MessageType,
     Favorite,
+)
 
 from aiorussound.util import (
     controller_device_str,
