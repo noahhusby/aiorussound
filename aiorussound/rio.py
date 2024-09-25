@@ -374,10 +374,14 @@ class RussoundClient:
                     device_str, "firmwareVersion"
                 )
             controller = Controller(
-                controller_id, controller_type, mac_address, firmware_version, {}
+                controller_id,
+                controller_type,
+                self,
+                controller_device_str(controller_id),
+                mac_address,
+                firmware_version,
+                {},
             )
-            controller.client = self
-            controller.device_str = controller_device_str(controller_id)
             return controller
         except CommandError:
             return None
@@ -465,11 +469,13 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
 
 
 @dataclass
-class Controller(AbstractControlSurface):
+class Controller:
     """Data class representing a Russound controller."""
 
     controller_id: int
     controller_type: str
+    client: RussoundClient
+    device_str: str
     mac_address: Optional[str]
     firmware_version: Optional[str]
     zones: dict[int, ZoneControlSurface] = field(default_factory=dict)
