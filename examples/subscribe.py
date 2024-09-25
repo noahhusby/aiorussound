@@ -19,7 +19,7 @@ async def main():
     conn_handler = RussoundTcpConnectionHandler(asyncio.get_running_loop(), HOST, PORT)
     client = RussoundClient(conn_handler)
 
-    await client.register_state_update_callbacks(on_state_change)
+    # await client.register_state_update_callbacks(on_state_change)
     await client.connect()
 
     for s_id, source in client.sources.items():

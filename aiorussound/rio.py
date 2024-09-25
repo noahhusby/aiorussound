@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 from asyncio import Future, Task, AbstractEventLoop, Queue
 from dataclasses import field, dataclass
 from typing import Any, Coroutine, Optional
@@ -36,6 +35,7 @@ from aiorussound.util import (
     zone_device_str,
     is_rnet_capable,
     get_max_zones,
+    map_rio_to_dict,
 )
 
 _LOGGER = logging.getLogger(__package__)
@@ -107,26 +107,7 @@ class RussoundClient:
             future: Future = await self._futures.get()
             future.set_exception(CommandError)
         if msg.branch and msg.leaf and msg.type == "N":
-            # Map the RIO syntax to a state dict
-            path = re.findall(r"\w+\[?\d*]?", msg.branch)
-            current = self.state
-            for part in path:
-                match = re.match(r"(\w+)\[(\d+)]", part)
-                if match:
-                    key, index = match.groups()
-                    index = int(index)
-                    if key not in current:
-                        current[key] = {}
-                    if index not in current[key]:
-                        current[key][index] = {}
-                    current = current[key][index]
-                else:
-                    if part not in current:
-                        current[part] = {}
-                    current = current[part]
-
-            # Set the leaf and value in the final dictionary location
-            current[msg.leaf] = msg.value
+            map_rio_to_dict(self.state, msg.branch, msg.leaf, msg.value)
             subscription = self._subscriptions.get(msg.branch)
             if subscription:
                 await subscription()
