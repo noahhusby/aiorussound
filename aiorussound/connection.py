@@ -10,7 +10,6 @@ from aiorussound.const import (
 
 _LOGGER = logging.getLogger(__package__)
 
-
 class RussoundConnectionHandler:
     def __init__(self) -> None:
         self.reader: Optional[StreamReader] = None

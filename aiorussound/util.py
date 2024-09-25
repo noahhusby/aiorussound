@@ -46,7 +46,6 @@ def is_fw_version_higher(fw_a: str, fw_b: str) -> bool:
         or (a_major == b_major and a_minor == b_minor and a_patch >= b_patch)
     )
 
-
 def controller_device_str(controller_id: int) -> str:
     """Return a string representation of the specified controller device."""
     return f"C[{controller_id}]"
@@ -71,6 +70,15 @@ def get_max_zones(model: str) -> int:
     return 1
 
 
+def get_max_zones_favorites(model: str) -> int:
+    """Return a maximum number of zones favorites supported by a specific controller."""
+    if model in ("MCA-88", "MCA-88X", "MCA-C5", "MCA-66", "MCA-C3", "MBX-AMP", "MBX-PRE"):
+        return 4
+    if model in ("XSource", "XZone4", "XZone70V"):
+        return 2
+    return 0
+
+  
 def is_rnet_capable(model: str) -> bool:
     """Return whether a controller is rnet capable."""
     return model in ("MCA-88X", "MCA-88", "MCA-66", "MCA-C5", "MCA-C3")

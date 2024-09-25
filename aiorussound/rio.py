@@ -14,6 +14,8 @@ from aiorussound.const import (
     MAX_SOURCE,
     MINIMUM_API_SUPPORT,
     FeatureFlag,
+    SYSTEM_KEY,
+    MAX_SYSTEM_FAVORITES,
     MAX_RNET_CONTROLLERS,
     RESPONSE_REGEX,
     KEEP_ALIVE_INTERVAL,
@@ -30,9 +32,12 @@ from aiorussound.models import (
     Source,
     Zone,
     MessageType,
-)
+    Favorite,
+
 from aiorussound.util import (
     controller_device_str,
+    get_max_zones,
+    get_max_zones_favorites,
     is_feature_supported,
     is_fw_version_higher,
     source_device_str,
@@ -398,10 +403,59 @@ class RussoundClient:
         return flags
 
 
+    async def enumerate_system_favorites(self) -> list[Favorite]:
+        """Return a list of Favorite for this system."""
+        favorites = []
+
+        for favorite_id in range(1, MAX_SYSTEM_FAVORITES):
+            try:
+                valid = await self._get_system_favorite_variable(favorite_id, "valid")
+                if valid == "TRUE":
+                    try:
+                        name = await self._get_system_favorite_variable(
+                            favorite_id, "name"
+                        )
+                        providerMode = await self._get_system_favorite_variable(
+                            favorite_id, "providerMode"
+                        )
+                        albumCoverURL = await self._get_system_favorite_variable(
+                            favorite_id, "albumCoverURL"
+                        )
+                        source_id = await self._get_system_favorite_variable(
+                            favorite_id, "source"
+                        )
+
+                        favorites.append(
+                            Favorite(
+                                favorite_id,
+                                True,
+                                name,
+                                providerMode,
+                                albumCoverURL,
+                                source_id,
+                            )
+                        )
+                    except CommandError:
+                        break
+            except CommandError:
+                continue
+        return favorites
+
+    async def _get_system_favorite_variable(self, favorite_id, variable) -> str:
+        """Return a system favorite variable."""
+        try:
+            return await self.get_variable(
+                SYSTEM_KEY, f"favorite[{favorite_id}].{variable}"
+            )
+        except UncachedVariableError:
+            return "False"
+
+
 class AbstractControlSurface:
     def __init__(self):
         self.client: Optional[RussoundClient] = None
         self.device_str: Optional[str] = None
+
 
 
 class ZoneControlSurface(Zone, AbstractControlSurface):
@@ -468,6 +522,47 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
         """Select a source."""
         return await self.send_event("SelectSource", source)
 
+    async def enumerate_favorites(self) -> list[Favorite]:
+        """Return a list of Favorite for this zone."""
+        favorites = []
+        if self.controller.max_zone_favorites > 0:
+            for favorite_id in range(1, self.controller.max_zone_favorites):
+                try:
+                    valid = await self.instance.get_variable(
+                        self.device_str(), f"favorite[{favorite_id}].valid"
+                    )
+                    if valid == "TRUE":
+                        try:
+                            name = await self.instance.get_variable(
+                                self.device_str(), f"favorite[{favorite_id}].name"
+                            )
+                            providerMode = await self.instance.get_variable(
+                                self.device_str(),
+                                f"favorite[{favorite_id}].providerMode",
+                            )
+                            albumCoverURL = await self.instance.get_variable(
+                                self.device_str(),
+                                f"favorite[{favorite_id}].albumCoverURL",
+                            )
+                            source_id = await self.instance.get_variable(
+                                self.device_str(), f"favorite[{favorite_id}].source"
+                            )
+
+                            favorites.append(
+                                Favorite(
+                                    favorite_id,
+                                    False,
+                                    name,
+                                    providerMode,
+                                    albumCoverURL,
+                                    source_id,
+                                )
+                            )
+                        except CommandError:
+                            break
+                except CommandError:
+                    continue
+        return favorites
 
 @dataclass
 class Controller:

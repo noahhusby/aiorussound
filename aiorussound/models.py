@@ -9,6 +9,17 @@ from mashumaro.mixins.orjson import DataClassORJSONMixin
 
 
 @dataclass
+class Favorite:
+    """Russound Favorite."""
+
+    favorite_id: int
+    is_system_favorite: bool
+    name: str
+    provider_mode: str
+    album_cover_url: str
+    source_id: int
+      
+@dataclass
 class Zone(DataClassORJSONMixin):
     """Data class representing Russound state."""
 
@@ -77,7 +88,6 @@ class Source(DataClassORJSONMixin):
     bit_depth: str = field(metadata=field_options(alias="bitDepth"), default=None)
     play_time: str = field(metadata=field_options(alias="playTime"), default=None)
     track_time: str = field(metadata=field_options(alias="trackTime"), default=None)
-
 
 class CallbackType(StrEnum):
     """Callback type."""
