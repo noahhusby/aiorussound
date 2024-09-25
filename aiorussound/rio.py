@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from asyncio import Future, Task, AbstractEventLoop
+from asyncio import Future, Task, AbstractEventLoop, Queue
 from dataclasses import field, dataclass
 from typing import Any, Coroutine, Optional
 
@@ -35,6 +35,7 @@ from aiorussound.util import (
     source_device_str,
     zone_device_str,
     is_rnet_capable,
+    get_max_zones,
 )
 
 _LOGGER = logging.getLogger(__package__)
@@ -58,6 +59,7 @@ class RussoundClient:
         self.sources: dict[int, Source] = {}
         self.rio_version: str | None = None
         self.state = {}
+        self._futures: Queue = Queue()
 
     async def register_state_update_callbacks(self, callback: Any):
         """Register state update callback."""
@@ -86,31 +88,41 @@ class RussoundClient:
         if callbacks:
             await asyncio.gather(*callbacks)
 
-    async def _on_msg_recv(self, msg: RussoundMessage) -> None:
-        if msg.branch and msg.leaf and msg.type == "N":
-            path = re.findall(r"\w+\[?\d*]?", msg.branch)
+    async def request(self, cmd: str):
+        _LOGGER.debug("Sending command '%s' to Russound client", cmd)
+        future: Future = Future()
+        await self._futures.put(future)
+        try:
+            await self.connection_handler.send(cmd)
+        except (CommandError, RussoundError) as ex:
+            _ = await self._futures.get()
+            future.set_exception(ex)
+        return await future
 
-            # Navigate through the dictionary according to the path
+    async def _on_msg_recv(self, msg: RussoundMessage) -> None:
+        if msg.type == "S":
+            future: Future = await self._futures.get()
+            future.set_result(msg.value)
+        elif msg.type == "E":
+            future: Future = await self._futures.get()
+            future.set_exception(CommandError)
+        if msg.branch and msg.leaf and msg.type == "N":
+            # Map the RIO syntax to a state dict
+            path = re.findall(r"\w+\[?\d*]?", msg.branch)
             current = self.state
             for part in path:
-                # Check if part contains an index (e.g., 'favorite[1]')
                 match = re.match(r"(\w+)\[(\d+)]", part)
                 if match:
                     key, index = match.groups()
                     index = int(index)
-                    # Create the key if it doesn't exist
                     if key not in current:
                         current[key] = {}
-                    # Create the indexed dictionary if it doesn't exist
                     if index not in current[key]:
                         current[key][index] = {}
-                    # Move into the indexed part of the dictionary
                     current = current[key][index]
                 else:
-                    # Normal key without index
                     if part not in current:
                         current[part] = {}
-                    # Move into the dictionary
                     current = current[part]
 
             # Set the leaf and value in the final dictionary location
@@ -134,7 +146,7 @@ class RussoundClient:
 
     async def connect_handler(self, res):
         await self.connection_handler.connect(reconnect=True)
-        self.rio_version = await self.connection_handler.send("VERSION")
+        self.rio_version = await self.request("VERSION")
         if not is_fw_version_higher(self.rio_version, MINIMUM_API_SUPPORT):
             await self.connection_handler.close()
             raise UnsupportedFeatureError(
@@ -171,8 +183,8 @@ class RussoundClient:
             except CommandError:
                 break
 
-        for controller_id in self.controllers.keys():
-            for zone_id in range(1, 8 + 1):
+        for controller_id, controller in self.controllers.items():
+            for zone_id in range(1, get_max_zones(controller.controller_type) + 1):
                 try:
                     device_str = zone_device_str(controller_id, zone_id)
                     name = await self.get_variable(device_str, "name")
@@ -196,7 +208,7 @@ class RussoundClient:
     async def subscribe(self, callback: Any, branch: str) -> None:
         self._subscriptions[branch] = callback
         try:
-            await self.connection_handler.send(f"WATCH {branch} ON")
+            await self.request(f"WATCH {branch} ON")
         except (asyncio.CancelledError, asyncio.TimeoutError, CommandError):
             del self._subscriptions[branch]
             raise
@@ -231,14 +243,14 @@ class RussoundClient:
         self, device_str: str, key: str, value: str
     ) -> Coroutine[Any, Any, str]:
         """Set a zone variable to a new value."""
-        return self.connection_handler.send(f'SET {device_str}.{key}="{value}"')
+        return self.request(f'SET {device_str}.{key}="{value}"')
 
     async def get_variable(self, device_str: str, key: str) -> str:
         """Retrieve the current value of a zone variable.  If the variable is
         not found in the local cache then the value is requested from the
         controller.
         """
-        return await self.connection_handler.send(f"GET {device_str}.{key}")
+        return await self.request(f"GET {device_str}.{key}")
 
     async def _load_controller(self, controller_id: int) -> Optional[Controller]:
         device_str = controller_device_str(controller_id)
@@ -284,7 +296,7 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
         """Send an event to a zone."""
         args = " ".join(str(x) for x in args)
         cmd = f"EVENT {self.device_str}!{event_name} {args}"
-        return await self.client.connection_handler.send(cmd)
+        return await self.client.request(cmd)
 
     # def fetch_current_source(self) -> Source:
     #     """Return the current source as a source object."""

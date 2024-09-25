@@ -19,30 +19,30 @@ class Zone(DataClassORJSONMixin):
     balance: str = field(metadata=field_options(alias="balance"), default="0")
     loudness: str = field(metadata=field_options(alias="loudness"), default="OFF")
     turn_on_volume: str = field(
-        metadata=field_options(alias="turnonvolume"), default="20"
+        metadata=field_options(alias="turnOnVolume"), default="20"
     )
     do_not_disturb: str = field(
-        metadata=field_options(alias="donotdisturb"), default="OFF"
+        metadata=field_options(alias="doNotDisturb"), default="OFF"
     )
-    party_mode: str = field(metadata=field_options(alias="partymode"), default="OFF")
+    party_mode: str = field(metadata=field_options(alias="partyMode"), default="OFF")
     status: str = field(metadata=field_options(alias="status"), default="OFF")
     is_mute: str = field(metadata=field_options(alias="mute"), default="OFF")
     shared_source: str = field(
-        metadata=field_options(alias="sharedsource"), default="OFF"
+        metadata=field_options(alias="sharedSource"), default="OFF"
     )
     last_error: Optional[str] = field(
-        metadata=field_options(alias="lasterror"), default=None
+        metadata=field_options(alias="lastError"), default=None
     )
     page: Optional[str] = field(metadata=field_options(alias="page"), default=None)
     sleep_time_default: Optional[str] = field(
-        metadata=field_options(alias="sleeptimedefault"), default=None
+        metadata=field_options(alias="sleepTimeDefault"), default=None
     )
     sleep_time_remaining: Optional[str] = field(
-        metadata=field_options(alias="sleeptimeremaining"), default=None
+        metadata=field_options(alias="sleepTimeRemaining"), default=None
     )
     enabled: str = field(metadata=field_options(alias="enabled"), default="False")
     current_source: str = field(
-        metadata=field_options(alias="currentsource"), default="1"
+        metadata=field_options(alias="currentSource"), default="1"
     )
 
 
@@ -54,29 +54,29 @@ class Source(DataClassORJSONMixin):
     type: str = field(metadata=field_options(alias="type"), default=None)
     channel: str = field(metadata=field_options(alias="channel"), default=None)
     cover_art_url: str = field(
-        metadata=field_options(alias="covertarturl"), default=None
+        metadata=field_options(alias="coverArtURL"), default=None
     )
-    channel_name: str = field(metadata=field_options(alias="channelname"), default=None)
+    channel_name: str = field(metadata=field_options(alias="channelName"), default=None)
     genre: str = field(metadata=field_options(alias="genre"), default=None)
-    artist_name: str = field(metadata=field_options(alias="artistname"), default=None)
-    album_name: str = field(metadata=field_options(alias="albumname"), default=None)
+    artist_name: str = field(metadata=field_options(alias="artistName"), default=None)
+    album_name: str = field(metadata=field_options(alias="albumName"), default=None)
     playlist_name: str = field(
-        metadata=field_options(alias="playlistname"), default=None
+        metadata=field_options(alias="playlistName"), default=None
     )
-    song_name: str = field(metadata=field_options(alias="songname"), default=None)
+    song_name: str = field(metadata=field_options(alias="songName"), default=None)
     program_service_name: str = field(
-        metadata=field_options(alias="programservicename"), default=None
+        metadata=field_options(alias="programServiceName"), default=None
     )
-    radio_text: str = field(metadata=field_options(alias="radiotext"), default=None)
-    shuffle_mode: str = field(metadata=field_options(alias="shufflemode"), default=None)
-    repeat_mode: str = field(metadata=field_options(alias="repeatmode"), default=None)
+    radio_text: str = field(metadata=field_options(alias="radioText"), default=None)
+    shuffle_mode: str = field(metadata=field_options(alias="shuffleMode"), default=None)
+    repeat_mode: str = field(metadata=field_options(alias="repeatMode"), default=None)
     mode: str = field(metadata=field_options(alias="mode"), default=None)
-    play_status: str = field(metadata=field_options(alias="playstatus"), default=None)
-    sample_rate: str = field(metadata=field_options(alias="samplerate"), default=None)
-    bit_rate: str = field(metadata=field_options(alias="bitrate"), default=None)
-    bit_depth: str = field(metadata=field_options(alias="bitdepth"), default=None)
-    play_time: str = field(metadata=field_options(alias="playtime"), default=None)
-    track_time: str = field(metadata=field_options(alias="tracktime"), default=None)
+    play_status: str = field(metadata=field_options(alias="playStatus"), default=None)
+    sample_rate: str = field(metadata=field_options(alias="sampleRate"), default=None)
+    bit_rate: str = field(metadata=field_options(alias="bitRate"), default=None)
+    bit_depth: str = field(metadata=field_options(alias="bitDepth"), default=None)
+    play_time: str = field(metadata=field_options(alias="playTime"), default=None)
+    track_time: str = field(metadata=field_options(alias="trackTime"), default=None)
 
 
 class CallbackType(StrEnum):

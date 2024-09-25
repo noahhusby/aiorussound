@@ -29,6 +29,7 @@ async def main():
         print(f"Found controller {c_id} - {controller.mac_address}")
         for z_id, zone in controller.zones.items():
             print(f"Found zone {z_id} - {zone.name}")
+    print(client.state)
 
     # Play media using the unit's front controls or Russound app
     await asyncio.sleep(60)
