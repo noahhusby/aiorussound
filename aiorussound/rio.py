@@ -154,7 +154,8 @@ class RussoundClient:
         handler_tasks = set()
         try:
             self._do_state_update = False
-            await self.connection_handler.connect()
+            async with asyncio.timeout(TIMEOUT):
+                await self.connection_handler.connect()
             handler_tasks.add(
                 asyncio.create_task(self.consumer_handler(self.connection_handler))
             )
