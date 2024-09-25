@@ -70,7 +70,8 @@ class RussoundClient:
     async def register_state_update_callbacks(self, callback: Any):
         """Register state update callback."""
         self._state_update_callbacks.append(callback)
-        await callback(self, CallbackType.STATE)
+        if self._do_state_update:
+            await callback(self, CallbackType.STATE)
 
     def unregister_state_update_callbacks(self, callback: Any):
         """Unregister state update callback."""
@@ -132,14 +133,12 @@ class RussoundClient:
         reconnect_delay = 0.5
         while True:
             try:
-                self.connect_task = asyncio.create_task(
-                    self._connect_handler(self.connect_result)
-                )
+                self.connect_task = asyncio.create_task(self._connect_handler(res))
                 await self.connect_task
             except Exception as ex:
                 _LOGGER.error(ex)
                 pass
-                await self.do_state_update_callbacks(CallbackType.CONNECTION)
+            await self.do_state_update_callbacks(CallbackType.CONNECTION)
             if not self._attempt_reconnection:
                 _LOGGER.debug(
                     "Failed to connect to device on initial pass, skipping reconnect."
@@ -155,13 +154,12 @@ class RussoundClient:
         handler_tasks = set()
         try:
             self._do_state_update = False
-            await self.connection_handler.connect(reconnect=True)
+            await self.connection_handler.connect()
             handler_tasks.add(
                 asyncio.create_task(self.consumer_handler(self.connection_handler))
             )
             self.rio_version = await self.request("VERSION")
             if not is_fw_version_higher(self.rio_version, MINIMUM_API_SUPPORT):
-                await self.connection_handler.close()
                 raise UnsupportedFeatureError(
                     f"Russound RIO API v{self.rio_version} is not supported. The minimum "
                     f"supported version is v{MINIMUM_API_SUPPORT}"
@@ -403,10 +401,10 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
         cmd = f"EVENT {self.device_str}!{event_name} {args}"
         return await self.client.request(cmd)
 
-    # def fetch_current_source(self) -> Source:
-    #     """Return the current source as a source object."""
-    #     current_source = int(self.properties.current_source)
-    #     return self.client.sources[current_source]
+    def fetch_current_source(self) -> Source:
+        """Return the current source as a source object."""
+        current_source = int(self.current_source)
+        return self.client.sources[current_source]
 
     async def mute(self) -> str:
         """Mute the zone."""
