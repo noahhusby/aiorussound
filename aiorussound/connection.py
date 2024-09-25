@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from abc import abstractmethod
-from asyncio import AbstractEventLoop, Queue, StreamReader, StreamWriter, Future
+from asyncio import AbstractEventLoop, Queue, StreamReader, StreamWriter
 from typing import Any, Optional
 
 from aiorussound import CommandError
@@ -11,7 +11,7 @@ from aiorussound.const import (
     RESPONSE_REGEX,
     KEEP_ALIVE_INTERVAL,
 )
-from aiorussound.models import RussoundMessage
+from aiorussound.models import RussoundMessage, MessageType
 
 _LOGGER = logging.getLogger(__package__)
 
@@ -38,19 +38,15 @@ def _process_response(res: bytes) -> Optional[RussoundMessage]:
     if not str_res:
         return None
     if len(str_res) == 1 and str_res[0] == "S":
-        return RussoundMessage("S", None, None, None, None, None)
+        return RussoundMessage(MessageType.STATE, None, None, None)
     tag, payload = str_res[0], str_res[2:]
     if tag == "E":
         _LOGGER.debug("Device responded with error: %s", payload)
-        raise CommandError(payload)
+        return RussoundMessage(tag, None, None, payload)
     m = RESPONSE_REGEX.match(payload.strip())
     if not m:
-        return RussoundMessage(tag, None, None, None, None, None)
-    p = m.groupdict()
-    value = p["value"] or p["value_only"]
-    return RussoundMessage(
-        tag, p["variable"], value, p["zone"], p["controller"], p["source"]
-    )
+        return RussoundMessage(tag, None, None, None)
+    return RussoundMessage(tag, m.group(1) or None, m.group(2), m.group(3))
 
 
 class RussoundConnectionHandler:
@@ -66,14 +62,11 @@ class RussoundConnectionHandler:
     async def close(self):
         raise NotImplementedError
 
-    async def send(self, cmd: str) -> str:
+    async def send(self, cmd: str) -> None:
         """Send a command to the Russound client."""
         if not self.connected:
             raise CommandError("Not connected to device.")
-        _LOGGER.debug("Sending command '%s' to Russound client", cmd)
-        future: Future = Future()
-        await self._cmd_queue.put((cmd, future))
-        return await future
+        await self._cmd_queue.put(cmd)
 
     @abstractmethod
     async def connect(self, reconnect=True) -> None:
@@ -151,7 +144,6 @@ class RussoundTcpConnectionHandler(RussoundConnectionHandler):
         queue_future = ensure_future(self._cmd_queue.get())
         net_future = ensure_future(reader.readline())
         keep_alive_task = asyncio.create_task(self._keep_alive())
-        last_command_future = None
 
         try:
             _LOGGER.debug("Starting IO loop")
@@ -162,24 +154,15 @@ class RussoundTcpConnectionHandler(RussoundConnectionHandler):
 
                 if net_future in done:
                     response = net_future.result()
-                    try:
-                        msg = _process_response(response)
-                        if msg:
-                            await self._on_msg_recv(msg)
-                            if msg.tag == "S" and last_command_future:
-                                last_command_future.set_result(msg.value)
-                                last_command_future = None
-                    except CommandError as e:
-                        if last_command_future:
-                            last_command_future.set_exception(e)
-                            last_command_future = None
+                    msg = _process_response(response)
+                    if msg:
+                        await self._on_msg_recv(msg)
                     net_future = ensure_future(reader.readline())
 
-                if queue_future in done and not last_command_future:
-                    cmd, future = queue_future.result()
+                if queue_future in done:
+                    cmd = queue_future.result()
                     writer.write(bytearray(f"{cmd}\r", "utf-8"))
                     await writer.drain()
-                    last_command_future = future
                     queue_future = ensure_future(self._cmd_queue.get())
         except asyncio.CancelledError:
             _LOGGER.debug("IO loop cancelled")

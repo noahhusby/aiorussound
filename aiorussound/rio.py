@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from asyncio import Future, Task, AbstractEventLoop
+import re
+from asyncio import Future, Task, AbstractEventLoop, Queue
+from dataclasses import field, dataclass
 from typing import Any, Coroutine, Optional
 
 from aiorussound.connection import RussoundConnectionHandler
@@ -17,24 +19,23 @@ from aiorussound.const import (
 )
 from aiorussound.exceptions import (
     CommandError,
-    UncachedVariableError,
     UnsupportedFeatureError,
     RussoundError,
 )
 from aiorussound.models import (
     RussoundMessage,
-    ZoneProperties,
-    SourceProperties,
     CallbackType,
+    Source,
+    Zone,
 )
 from aiorussound.util import (
     controller_device_str,
-    get_max_zones,
     is_feature_supported,
     is_fw_version_higher,
     source_device_str,
     zone_device_str,
     is_rnet_capable,
+    get_max_zones,
 )
 
 _LOGGER = logging.getLogger(__package__)
@@ -53,11 +54,12 @@ class RussoundClient:
         self._subscriptions: dict[str, Any] = {}
         self.connect_result: Future | None = None
         self.connect_task: Task | None = None
-        self._state: dict[str, dict[str, str]] = {}
         self._state_update_callbacks: list[Any] = []
         self.controllers: dict[int, Controller] = {}
         self.sources: dict[int, Source] = {}
         self.rio_version: str | None = None
+        self.state = {}
+        self._futures: Queue = Queue()
 
     async def register_state_update_callbacks(self, callback: Any):
         """Register state update callback."""
@@ -86,43 +88,48 @@ class RussoundClient:
         if callbacks:
             await asyncio.gather(*callbacks)
 
-    def _retrieve_cached_variable(self, device_str: str, key: str) -> str:
-        """Retrieve the cache state of the named variable for a particular
-        device. If the variable has not been cached then the UncachedVariable
-        exception is raised.
-        """
+    async def request(self, cmd: str):
+        _LOGGER.debug("Sending command '%s' to Russound client", cmd)
+        future: Future = Future()
+        await self._futures.put(future)
         try:
-            s = self._state[device_str][key.lower()]
-            _LOGGER.debug("Zone Cache retrieve %s.%s = %s", device_str, key, s)
-            return s
-        except KeyError:
-            raise UncachedVariableError
-
-    async def _store_cached_variable(
-        self, device_str: str, key: str, value: str
-    ) -> None:
-        """Store the current known value of a device variable into the cache.
-        Calls any device callbacks.
-        """
-        zone_state = self._state.setdefault(device_str, {})
-        key = key.lower()
-        zone_state[key] = value
-        _LOGGER.debug("Cache store %s.%s = %s", device_str, key, value)
-        # Handle callbacks
-        await self.do_state_update_callbacks()
+            await self.connection_handler.send(cmd)
+        except (CommandError, RussoundError) as ex:
+            _ = await self._futures.get()
+            future.set_exception(ex)
+        return await future
 
     async def _on_msg_recv(self, msg: RussoundMessage) -> None:
-        if msg.source:
-            source_id = int(msg.source)
-            await self._store_cached_variable(
-                source_device_str(source_id), msg.variable, msg.value
-            )
-        elif msg.zone:
-            controller_id = int(msg.controller)
-            zone_id = int(msg.zone)
-            await self._store_cached_variable(
-                zone_device_str(controller_id, zone_id), msg.variable, msg.value
-            )
+        if msg.type == "S":
+            future: Future = await self._futures.get()
+            future.set_result(msg.value)
+        elif msg.type == "E":
+            future: Future = await self._futures.get()
+            future.set_exception(CommandError)
+        if msg.branch and msg.leaf and msg.type == "N":
+            # Map the RIO syntax to a state dict
+            path = re.findall(r"\w+\[?\d*]?", msg.branch)
+            current = self.state
+            for part in path:
+                match = re.match(r"(\w+)\[(\d+)]", part)
+                if match:
+                    key, index = match.groups()
+                    index = int(index)
+                    if key not in current:
+                        current[key] = {}
+                    if index not in current[key]:
+                        current[key][index] = {}
+                    current = current[key][index]
+                else:
+                    if part not in current:
+                        current[part] = {}
+                    current = current[part]
+
+            # Set the leaf and value in the final dictionary location
+            current[msg.leaf] = msg.value
+            subscription = self._subscriptions.get(msg.branch)
+            if subscription:
+                await subscription()
 
     async def connect(self) -> None:
         """Connect to the controller and start processing responses."""
@@ -139,7 +146,7 @@ class RussoundClient:
 
     async def connect_handler(self, res):
         await self.connection_handler.connect(reconnect=True)
-        self.rio_version = await self.connection_handler.send("VERSION")
+        self.rio_version = await self.request("VERSION")
         if not is_fw_version_higher(self.rio_version, MINIMUM_API_SUPPORT):
             await self.connection_handler.close()
             raise UnsupportedFeatureError(
@@ -149,17 +156,20 @@ class RussoundClient:
         _LOGGER.info("Connected (Russound RIO v%s})", self.rio_version)
 
         # Fetch parent controller
-        parent_controller = await self._get_controller(1)
+        parent_controller = await self._load_controller(1)
         if not parent_controller:
             raise RussoundError("No primary controller found.")
+
         self.controllers[1] = parent_controller
 
         # Only search for daisy-chained controllers if the parent supports RNET
         if is_rnet_capable(parent_controller.controller_type):
             for controller_id in range(2, MAX_RNET_CONTROLLERS + 1):
-                controller = await self._get_controller(controller_id)
+                controller = await self._load_controller(controller_id)
                 if controller:
                     self.controllers[controller_id] = controller
+
+        subscribe_state_updates = {self.subscribe(self._async_handle_system, "System")}
 
         # Load source structure
         for source_id in range(1, MAX_SOURCE):
@@ -167,29 +177,62 @@ class RussoundClient:
                 device_str = source_device_str(source_id)
                 name = await self.get_variable(device_str, "name")
                 if name:
-                    source = Source(self, source_id, name)
-                    self.sources[source_id] = source
+                    subscribe_state_updates.add(
+                        self.subscribe(self._async_handle_source, device_str)
+                    )
             except CommandError:
                 break
 
-        subscribe_state_updates = {self.subscribe(self._async_handle_system, "System")}
+        for controller_id, controller in self.controllers.items():
+            for zone_id in range(1, get_max_zones(controller.controller_type) + 1):
+                try:
+                    device_str = zone_device_str(controller_id, zone_id)
+                    name = await self.get_variable(device_str, "name")
+                    if name:
+                        subscribe_state_updates.add(
+                            self.subscribe(self._async_handle_zone, device_str)
+                        )
+                except CommandError:
+                    break
+
         subscribe_tasks = set()
         for state_update in subscribe_state_updates:
             subscribe_tasks.add(asyncio.create_task(state_update))
         await asyncio.wait(subscribe_tasks)
+
+        # Delay to ensure async TTL
+        await asyncio.sleep(0.2)
 
         res.set_result(True)
 
     async def subscribe(self, callback: Any, branch: str) -> None:
         self._subscriptions[branch] = callback
         try:
-            await self.connection_handler.send(f"WATCH {branch} ON")
+            await self.request(f"WATCH {branch} ON")
         except (asyncio.CancelledError, asyncio.TimeoutError, CommandError):
             del self._subscriptions[branch]
             raise
 
-    async def _async_handle_system(self, branch: str, value: str) -> None:
+    async def _async_handle_system(self) -> None:
         """Handle async info update."""
+        await self.do_state_update_callbacks()
+
+    async def _async_handle_source(self) -> None:
+        """Handle async info update."""
+        for source_id, source_data in self.state["S"].items():
+            source = Source.from_dict(source_data)
+            source.client = self
+            self.sources[source_id] = source
+        await self.do_state_update_callbacks()
+
+    async def _async_handle_zone(self) -> None:
+        """Handle async info update."""
+        for controller_id, controller_data in self.state["C"].items():
+            for zone_id, zone_data in controller_data["Z"].items():
+                zone = ZoneControlSurface.from_dict(zone_data)
+                zone.client = self
+                zone.device_str = zone_device_str(controller_id, zone_id)
+                self.controllers[controller_id].zones[zone_id] = zone
         await self.do_state_update_callbacks()
 
     async def close(self) -> None:
@@ -200,32 +243,16 @@ class RussoundClient:
         self, device_str: str, key: str, value: str
     ) -> Coroutine[Any, Any, str]:
         """Set a zone variable to a new value."""
-        return self.connection_handler.send(f'SET {device_str}.{key}="{value}"')
-
-    def get_cache(self, device_str: str) -> dict:
-        """Retrieve the cache for a given device by its device string."""
-        return self._state.get(device_str, {})
+        return self.request(f'SET {device_str}.{key}="{value}"')
 
     async def get_variable(self, device_str: str, key: str) -> str:
         """Retrieve the current value of a zone variable.  If the variable is
         not found in the local cache then the value is requested from the
         controller.
         """
-        try:
-            return self._retrieve_cached_variable(device_str, key)
-        except UncachedVariableError:
-            return await self.connection_handler.send(f"GET {device_str}.{key}")
+        return await self.request(f"GET {device_str}.{key}")
 
-    def get_cached_variable(self, device_str: str, key: str, default=None) -> str:
-        """Retrieve the current value of a zone variable from the cache or
-        return the default value if the variable is not present.
-        """
-        try:
-            return self._retrieve_cached_variable(device_str, key)
-        except UncachedVariableError:
-            return default
-
-    async def _get_controller(self, controller_id: int) -> Optional[Controller]:
+    async def _load_controller(self, controller_id: int) -> Optional[Controller]:
         device_str = controller_device_str(controller_id)
         try:
             controller_type = await self.get_variable(device_str, "type")
@@ -243,14 +270,7 @@ class RussoundClient:
                 firmware_version = await self.get_variable(
                     device_str, "firmwareVersion"
                 )
-            controller = Controller(
-                self,
-                controller_id,
-                mac_address,
-                controller_type,
-                firmware_version,
-            )
-            return controller
+            return Controller(controller_type, mac_address, firmware_version, {})
         except CommandError:
             return None
 
@@ -264,126 +284,24 @@ class RussoundClient:
                     flags.append(flag)
         return flags
 
-    async def watch(self, device_str: str) -> str:
-        """Watch a device."""
-        return await self.connection_handler.send(f"WATCH {device_str} ON")
 
-    async def unwatch(self, device_str: str) -> str:
-        """Unwatch a device."""
-        return await self.connection_handler.send(f"WATCH {device_str} OFF")
+class AbstractControlSurface:
+    def __init__(self):
+        self.client: Optional[RussoundClient] = None
+        self.device_str: Optional[str] = None
 
 
-class Controller:
-    """Uniquely identifies a controller."""
-
-    def __init__(
-        self,
-        client: RussoundClient,
-        controller_id: int,
-        mac_address: str,
-        controller_type: str,
-        firmware_version: str,
-    ) -> None:
-        """Initialize the controller."""
-        self.client = client
-        self.controller_id = controller_id
-        self.mac_address = mac_address
-        self.controller_type = controller_type
-        self.firmware_version = firmware_version
-        self.zones: dict[int, Zone] = {}
-        self.max_zones = get_max_zones(controller_type)
-
-    async def fetch_configuration(self) -> None:
-        """Fetches source and zone configuration from controller."""
-        await self._init_zones()
-
-    def __str__(self) -> str:
-        """Returns a string representation of the controller."""
-        return f"{self.controller_id}"
-
-    def __eq__(self, other: object) -> bool:
-        """Equality check."""
-        return (
-            hasattr(other, "controller_id")
-            and other.controller_id == self.controller_id
-        )
-
-    def __hash__(self) -> int:
-        """Hashes the controller id."""
-        return hash(str(self))
-
-    async def _init_zones(self) -> None:
-        """Return a list of (zone_id, zone) tuples."""
-        self.zones = {}
-        for zone_id in range(1, self.max_zones + 1):
-            try:
-                device_str = zone_device_str(self.controller_id, zone_id)
-                name = await self.client.get_variable(device_str, "name")
-                if name:
-                    zone = Zone(self.client, self, zone_id, name)
-                    self.zones[zone_id] = zone
-
-            except CommandError:
-                break
-
-
-class Zone:
-    """Uniquely identifies a zone
-
-    Russound controllers can be linked together to expand the total zone count.
-    Zones are identified by their zone index (1-N) within the controller they
-    belong to and the controller index (1-N) within the entire system.
-    """
-
-    def __init__(
-        self, client: RussoundClient, controller: Controller, zone_id: int, name: str
-    ) -> None:
-        """Initialize a zone object."""
-        self.client = client
-        self.controller = controller
-        self.zone_id = int(zone_id)
-        self.name = name
-
-    def __str__(self) -> str:
-        """Return a string representation of the zone."""
-        return f"{self.controller.mac_address} > Z{self.zone_id}"
-
-    def __eq__(self, other: object) -> bool:
-        """Equality check."""
-        return (
-            hasattr(other, "zone_id")
-            and hasattr(other, "controller")
-            and other.zone_id == self.zone_id
-            and other.controller == self.controller
-        )
-
-    def __hash__(self) -> int:
-        """Hashes the zone id."""
-        return hash(str(self))
-
-    def device_str(self) -> str:
-        """Generate a string that can be used to reference this zone in a RIO
-        command
-        """
-        return zone_device_str(self.controller.controller_id, self.zone_id)
-
+class ZoneControlSurface(Zone, AbstractControlSurface):
     async def send_event(self, event_name, *args) -> str:
         """Send an event to a zone."""
         args = " ".join(str(x) for x in args)
-        cmd = f"EVENT {self.device_str()}!{event_name} {args}"
-        return await self.client.connection_handler.send(cmd)
+        cmd = f"EVENT {self.device_str}!{event_name} {args}"
+        return await self.client.request(cmd)
 
-    def _get(self, variable, default=None) -> str:
-        return self.client.get_cached_variable(self.device_str(), variable, default)
-
-    def fetch_current_source(self) -> Source:
-        """Return the current source as a source object."""
-        current_source = int(self.properties.current_source)
-        return self.client.sources[current_source]
-
-    @property
-    def properties(self) -> ZoneProperties:
-        return ZoneProperties.from_dict(self.client.get_cache(self.device_str()))
+    # def fetch_current_source(self) -> Source:
+    #     """Return the current source as a source object."""
+    #     current_source = int(self.properties.current_source)
+    #     return self.client.sources[current_source]
 
     async def mute(self) -> str:
         """Mute the zone."""
@@ -438,33 +356,11 @@ class Zone:
         return await self.send_event("SelectSource", source)
 
 
-class Source:
-    """Uniquely identifies a Source."""
+@dataclass
+class Controller:
+    """Data class representing a Russound controller."""
 
-    def __init__(self, client: RussoundClient, source_id: int, name: str) -> None:
-        """Initialize a Source."""
-        self.client = client
-        self.source_id = int(source_id)
-        self.name = name
-
-    def __str__(self) -> str:
-        """Return the current configuration of the source."""
-        return f"S{self.source_id}"
-
-    def __eq__(self, other: object) -> bool:
-        """Equality check."""
-        return hasattr(other, "source_id") and other.source_id == self.source_id
-
-    def __hash__(self) -> int:
-        """Hash the current configuration of the source."""
-        return hash(str(self))
-
-    def device_str(self) -> str:
-        """Generate a string that can be used to reference this zone in a RIO
-        command.
-        """
-        return source_device_str(self.source_id)
-
-    @property
-    def properties(self) -> SourceProperties:
-        return SourceProperties.from_dict(self.client.get_cache(self.device_str()))
+    controller_type: str
+    mac_address: Optional[str]
+    firmware_version: Optional[str]
+    zones: dict[int, ZoneControlSurface] = field(default_factory=dict)
