@@ -4,6 +4,8 @@
 
 #### An async python package for interfacing with Russound RIO hardware
 
+[**📖 Read the docs »**][docs]
+
 [![](https://github.com/noahhusby/aiorussound/actions/workflows/publish.yml/badge.svg)](https://github.com/noahhusby/aiorussound/actions/workflows/build.yml)
 [![](https://img.shields.io/github/license/noahhusby/aiorussound)](https://github.com/noahhusby/aiorussound/blob/main/LICENSE)
 [![](https://img.shields.io/pypi/implementation/aiorussound
@@ -45,3 +47,5 @@ The RS232 port must be configured to use the RIO protocol instead of the RNET pr
 
 ## Acknowledgements
 This is the continuation of the `russound_rio` package. This wouldn't be possible without the excellent work from [@wickerwaka](https://github.com/wickerwaka) and [@chphilli](https://github.com/chphilli).
+
+[docs]: https://noahhusby.github.io/aiorussound/

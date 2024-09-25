@@ -46,7 +46,6 @@ def is_fw_version_higher(fw_a: str, fw_b: str) -> bool:
         or (a_major == b_major and a_minor == b_minor and a_patch >= b_patch)
     )
 
-
 def controller_device_str(controller_id: int) -> str:
     """Return a string representation of the specified controller device."""
     return f"C[{controller_id}]"
@@ -78,3 +77,31 @@ def get_max_zones_favorites(model: str) -> int:
     if model in ("XSource", "XZone4", "XZone70V"):
         return 2
     return 0
+
+  
+def is_rnet_capable(model: str) -> bool:
+    """Return whether a controller is rnet capable."""
+    return model in ("MCA-88X", "MCA-88", "MCA-66", "MCA-C5", "MCA-C3")
+
+
+def map_rio_to_dict(state: dict, branch: str, leaf: str, value: str) -> None:
+    """Maps a RIO variable to a python dictionary."""
+    path = re.findall(r"\w+\[?\d*]?", branch)
+    current = state
+    for part in path:
+        match = re.match(r"(\w+)\[(\d+)]", part)
+        if match:
+            key, index = match.groups()
+            index = int(index)
+            if key not in current:
+                current[key] = {}
+            if index not in current[key]:
+                current[key][index] = {}
+            current = current[key][index]
+        else:
+            if part not in current:
+                current[part] = {}
+            current = current[part]
+
+    # Set the leaf and value in the final dictionary location
+    current[leaf] = value

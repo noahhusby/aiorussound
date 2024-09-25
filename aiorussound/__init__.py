@@ -1,15 +1,21 @@
-"""Asynchronous Python client for Russound RIO."""
+"""
+.. include:: ../README.md
+"""
+
 from .exceptions import (
+    RussoundError,
     CommandError,
     UncachedVariableError,
     UnsupportedFeatureError,
     UnsupportedRussoundVersionError,
 )
 from .connection import RussoundTcpConnectionHandler
-from .models import SourceProperties, ZoneProperties, RussoundMessage, Favorite
-from .rio import Controller, RussoundClient, Source, Zone
+from .models import Source, RussoundMessage, Zone, Favorite
+from .rio import Controller, RussoundClient
+
 
 __all__ = [
+    "RussoundError",
     "CommandError",
     "UnsupportedFeatureError",
     "UnsupportedRussoundVersionError",
@@ -17,10 +23,8 @@ __all__ = [
     "RussoundClient",
     "Controller",
     "Zone",
-    "Source",
     "RussoundTcpConnectionHandler",
-    "ZoneProperties",
-    "SourceProperties",
+    "Favorite",
+    "Source",
     "RussoundMessage",
-    "Favorite"
 ]
