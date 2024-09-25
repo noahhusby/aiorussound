@@ -19,7 +19,7 @@ async def main():
     conn_handler = RussoundTcpConnectionHandler(asyncio.get_running_loop(), HOST, PORT)
     client = RussoundClient(conn_handler)
 
-    # await client.register_state_update_callbacks(on_state_change)
+    await client.register_state_update_callbacks(on_state_change)
     await client.connect()
 
     for s_id, source in client.sources.items():
@@ -32,7 +32,7 @@ async def main():
     print(client.state)
 
     # Play media using the unit's front controls or Russound app
-    await asyncio.sleep(60)
+    await asyncio.sleep(512)
 
 
 if __name__ == "__main__":
