@@ -373,7 +373,9 @@ class RussoundClient:
                 firmware_version = await self.get_variable(
                     device_str, "firmwareVersion"
                 )
-            controller = Controller(controller_type, mac_address, firmware_version, {})
+            controller = Controller(
+                controller_id, controller_type, mac_address, firmware_version, {}
+            )
             controller.client = self
             controller.device_str = controller_device_str(controller_id)
             return controller
@@ -466,6 +468,7 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
 class Controller(AbstractControlSurface):
     """Data class representing a Russound controller."""
 
+    controller_id: int
     controller_type: str
     mac_address: Optional[str]
     firmware_version: Optional[str]
