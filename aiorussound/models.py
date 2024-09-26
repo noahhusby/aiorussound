@@ -18,7 +18,8 @@ class Favorite:
     provider_mode: str
     album_cover_url: str
     source_id: int
-      
+
+
 @dataclass
 class Zone(DataClassORJSONMixin):
     """Data class representing Russound state."""
