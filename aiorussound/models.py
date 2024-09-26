@@ -89,6 +89,7 @@ class Source(DataClassORJSONMixin):
     play_time: str = field(metadata=field_options(alias="playTime"), default=None)
     track_time: str = field(metadata=field_options(alias="trackTime"), default=None)
 
+
 class CallbackType(StrEnum):
     """Callback type."""
 
