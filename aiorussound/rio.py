@@ -458,7 +458,6 @@ class AbstractControlSurface:
         self.device_str: Optional[str] = None
 
 
-
 class ZoneControlSurface(Zone, AbstractControlSurface):
     async def send_event(self, event_name, *args) -> str:
         """Send an event to a zone."""
