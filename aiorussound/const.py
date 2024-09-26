@@ -13,14 +13,17 @@ DEFAULT_PORT = 9621
 RECONNECT_DELAY = 5.0
 TIMEOUT = 5.0
 
+KEEP_ALIVE_INTERVAL = 60
+
 MAX_SOURCE = 17
 MAX_SYSTEM_FAVORITES = 32
 
 SYSTEM_KEY = "System"
 
+MAX_RNET_CONTROLLERS = 6
+
 RESPONSE_REGEX = re.compile(
-    r"^(?:C\[(?P<controller>\d+)](?:\.Z\[(?P<zone>\d+)])?|S\[(?P<source>\d+)])?\."
-    r"(?P<variable>\S+)=\s*\"(?P<value>.*)\"$|^(?P<variable_only>\S+)=\s*\"(?P<value_only>.*)\"$"
+    r'(?:(\w+(?:\[\d+])?(?:\.\w+(?:\[\d+])?)*)\.)?(\w+)="([^"]*)"'
 )
 
 
@@ -156,10 +159,6 @@ FLAGS_BY_VERSION = {
 }
 
 VERSIONS_BY_FLAGS = defaultdict(list)
-
-ZONE_PROPERTIES: list[str] = ["currentSource"]
-
-SOURCE_PROPERTIES: list[str] = []
 
 for version, flags in FLAGS_BY_VERSION.items():
     for flag in flags:
