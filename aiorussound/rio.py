@@ -37,7 +37,6 @@ from aiorussound.models import (
 
 from aiorussound.util import (
     controller_device_str,
-    get_max_zones,
     get_max_zones_favorites,
     is_feature_supported,
     is_fw_version_higher,
