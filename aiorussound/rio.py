@@ -567,6 +567,81 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
                     continue
         return favorites
 
+    async def save_system_favorite(self, favorite_id: int, favorite_name=None) -> None:
+        """Save system favorite to controller."""
+        if favorite_name is None:
+            # default to channel name if no name is provided
+            favorite_name = self.client.sources[int(self.current_source)].channel_name
+
+        if favorite_name is None:
+            # if no channel name, set a default name
+            favorite_name = f"F{favorite_id}"
+
+        if favorite_id >= 1 and favorite_id <= MAX_SYSTEM_FAVORITES:
+            _LOGGER.debug("Saving system favorite %d", favorite_id)
+            await self.send_event(
+                "saveSystemFavorite", f'"{favorite_name}"', favorite_id
+            )
+        else:
+            raise RussoundError
+
+    async def save_zone_favorite(self, favorite_id: int, favorite_name=None) -> None:
+        """Save zone favorite to contoller."""
+        if favorite_name is None:
+            # default to channel name if no name is provided
+            favorite_name = self.client.sources[int(self.current_source)].channel_name
+
+        if favorite_name is None:
+            # if no channel name, set a default name
+            favorite_name = f"F{favorite_id}"
+
+        if favorite_id >= 1 and favorite_id <= get_max_zones_favorites(
+            self.client.controllers[1].controller_type
+        ):
+            _LOGGER.debug("Saving zone favorite %d", favorite_id)
+            await self.send_event("saveZoneFavorite", f'"{favorite_name}"', favorite_id)
+        else:
+            raise RussoundError
+
+    async def delete_system_favorite(self, favorite_id: int) -> None:
+        """Delete system favorite from contoller."""
+        self.delete_system_favorite(favorite_id)
+
+        if favorite_id >= 1 and favorite_id <= MAX_SYSTEM_FAVORITES:
+            _LOGGER.debug("Removing system favorite %d", favorite_id)
+            await self.send_event("deleteSystemFavorite", favorite_id)
+        else:
+            raise RussoundError
+
+    async def delete_zone_favorite(self, favorite_id: int) -> None:
+        """Delete zone favorite from contoller."""
+
+        if favorite_id >= 1 and favorite_id <= get_max_zones_favorites(
+            self.client.controllers[1].controller_type
+        ):
+            _LOGGER.debug("Removing zone favorite %d", favorite_id)
+            await self.send_event("deleteZoneFavorite", favorite_id)
+        else:
+            raise RussoundError
+
+    async def restore_system_favorite(self, favorite_id: int) -> None:
+        """Change to system favorite from contoller for this zone."""
+
+        if favorite_id >= 1 and favorite_id <= MAX_SYSTEM_FAVORITES:
+            await self.send_event("restoreSystemFavorite", favorite_id)
+        else:
+            raise RussoundError
+
+    async def restore_zone_favorite(self, favorite_id: int) -> None:
+        """Change to zone favorite from contoller for this zone."""
+
+        if favorite_id >= 1 and favorite_id <= get_max_zones_favorites(
+            self.client.controllers[1].controller_type
+        ):
+            await self.send_event("restoreZoneFavorite", favorite_id)
+        else:
+            raise RussoundError
+
 
 @dataclass
 class Controller:
