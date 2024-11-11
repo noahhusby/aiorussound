@@ -1,6 +1,11 @@
 import asyncio
 import logging
 
+# Uncomment lines below to use library from local dev
+# import sys
+# import os
+# sys.path.insert(1, os.path.join(os.path.dirname(__file__), '..'))
+
 from aiorussound import RussoundTcpConnectionHandler, RussoundClient
 from aiorussound.models import CallbackType
 

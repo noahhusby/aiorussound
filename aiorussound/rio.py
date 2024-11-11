@@ -213,6 +213,16 @@ class RussoundClient:
                 subscribe_tasks.add(asyncio.create_task(state_update))
             await asyncio.wait(subscribe_tasks)
 
+            if is_feature_supported(
+                self.rio_version, FeatureFlag.SUPPORT_ZONE_SOURCE_EXCLUSION
+            ):
+                _LOGGER.debug(
+                    "Zone source exclusion is supported. Fetching excluded sources."
+                )
+                await self._load_zone_source_exclusion()
+                # Reload zones from state
+                await self._async_handle_zone()
+
             self._do_state_update = True
             await self.do_state_update_callbacks(CallbackType.CONNECTION)
 
@@ -387,6 +397,33 @@ class RussoundClient:
             return controller
         except CommandError:
             return None
+
+    # ----------------------
+    # Manual state fixes
+    # ----------------------
+
+    async def _load_zone_source_exclusion(self) -> None:
+        """Loads whether a source is available to a specific zone."""
+        for controller_id, controller in self.controllers.items():
+            for zone_id in controller.zones.keys():
+                for source_id in self.sources.keys():
+                    try:
+                        enabled = await self.get_variable(
+                            f"C[{controller_id}].Z[{zone_id}].S[{source_id}]", "enabled"
+                        )
+                    except CommandError:
+                        continue
+                    if enabled == "TRUE":
+                        if (
+                            "enabled_sources"
+                            not in self.state["C"][controller_id]["Z"][zone_id]
+                        ):
+                            self.state["C"][controller_id]["Z"][zone_id][
+                                "enabled_sources"
+                            ] = []
+                        self.state["C"][controller_id]["Z"][zone_id][
+                            "enabled_sources"
+                        ].append(source_id)
 
     @property
     def supported_features(self) -> list[FeatureFlag]:
