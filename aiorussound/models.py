@@ -44,6 +44,9 @@ class Zone(DataClassORJSONMixin):
     current_source: str = field(
         metadata=field_options(alias="currentSource"), default="1"
     )
+    enabled_sources: list[int] = field(
+        metadata=field_options(alias="enabled_sources"), default_factory=list
+    )
 
 
 @dataclass
