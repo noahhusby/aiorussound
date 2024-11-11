@@ -284,7 +284,9 @@ class RussoundClient:
         m = RESPONSE_REGEX.match(payload.strip())
         if not m:
             return RussoundMessage(tag, None, None, None)
-        return RussoundMessage(tag, m.group(1) or None, m.group(2), m.group(3))
+        value = m.group(3)
+        value = None if not value or value == "------" else value
+        return RussoundMessage(tag, m.group(1) or None, m.group(2), value)
 
     async def consumer_handler(self, handler: RussoundConnectionHandler):
         """Callback consumer handler."""
@@ -451,8 +453,7 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
 
     def fetch_current_source(self) -> Source:
         """Return the current source as a source object."""
-        current_source = int(self.current_source)
-        return self.client.sources[current_source]
+        return self.client.sources[self.current_source]
 
     async def mute(self) -> str:
         """Mute the zone."""

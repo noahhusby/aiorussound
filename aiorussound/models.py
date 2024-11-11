@@ -6,80 +6,232 @@ from typing import Optional
 
 from mashumaro import field_options
 from mashumaro.mixins.orjson import DataClassORJSONMixin
+from mashumaro.types import SerializationStrategy
+
+
+class RussoundBool(SerializationStrategy):
+    def deserialize(self, value: str) -> bool:
+        if value and (value == "ON" or value == "TRUE"):
+            return True
+        return False
+
+
+class RussoundInt(SerializationStrategy):
+    def deserialize(self, value: str) -> int:
+        return int(value)
 
 
 @dataclass
 class Zone(DataClassORJSONMixin):
     """Data class representing Russound state."""
 
-    name: str = field(metadata=field_options(alias="name"), default=None)
-    volume: str = field(metadata=field_options(alias="volume"), default="0")
-    bass: str = field(metadata=field_options(alias="bass"), default="0")
-    treble: str = field(metadata=field_options(alias="treble"), default="0")
-    balance: str = field(metadata=field_options(alias="balance"), default="0")
-    loudness: str = field(metadata=field_options(alias="loudness"), default="OFF")
-    turn_on_volume: str = field(
-        metadata=field_options(alias="turnOnVolume"), default="20"
+    name: str = field(default=None)
+    volume: int = field(
+        metadata=field_options(serialization_strategy=RussoundInt()), default=0
     )
-    do_not_disturb: str = field(
-        metadata=field_options(alias="doNotDisturb"), default="OFF"
+    bass: int = field(
+        metadata=field_options(serialization_strategy=RussoundInt()), default=0
     )
-    party_mode: str = field(metadata=field_options(alias="partyMode"), default="OFF")
-    status: str = field(metadata=field_options(alias="status"), default="OFF")
-    is_mute: str = field(metadata=field_options(alias="mute"), default="OFF")
-    shared_source: str = field(
-        metadata=field_options(alias="sharedSource"), default="OFF"
+    treble: int = field(
+        metadata=field_options(serialization_strategy=RussoundInt()), default=0
+    )
+    balance: int = field(
+        metadata=field_options(serialization_strategy=RussoundInt()), default=0
+    )
+    loudness: bool = field(
+        metadata=field_options(serialization_strategy=RussoundBool()), default=False
+    )
+    turn_on_volume: int = field(
+        metadata=field_options(
+            alias="turnOnVolume", serialization_strategy=RussoundInt()
+        ),
+        default=20,
+    )
+    do_not_disturb: bool = field(
+        metadata=field_options(
+            alias="doNotDisturb", serialization_strategy=RussoundBool()
+        ),
+        default=False,
+    )
+    party_mode: bool = field(
+        metadata=field_options(
+            alias="partyMode", serialization_strategy=RussoundBool()
+        ),
+        default=False,
+    )
+    status: bool = field(
+        metadata=field_options(serialization_strategy=RussoundBool()), default=False
+    )
+    is_mute: bool = field(
+        metadata=field_options(alias="mute", serialization_strategy=RussoundBool()),
+        default=False,
+    )
+    shared_source: bool = field(
+        metadata=field_options(
+            alias="sharedSource", serialization_strategy=RussoundBool()
+        ),
+        default=False,
     )
     last_error: Optional[str] = field(
         metadata=field_options(alias="lastError"), default=None
     )
     page: Optional[str] = field(metadata=field_options(alias="page"), default=None)
-    sleep_time_default: Optional[str] = field(
-        metadata=field_options(alias="sleepTimeDefault"), default=None
+    sleep_time_default: Optional[int] = field(
+        metadata=field_options(
+            alias="sleepTimeDefault", serialization_strategy=RussoundInt()
+        ),
+        default=None,
     )
-    sleep_time_remaining: Optional[str] = field(
-        metadata=field_options(alias="sleepTimeRemaining"), default=None
+    sleep_time_remaining: Optional[int] = field(
+        metadata=field_options(
+            alias="sleepTimeRemaining", serialization_strategy=RussoundInt()
+        ),
+        default=None,
     )
-    enabled: str = field(metadata=field_options(alias="enabled"), default="False")
-    current_source: str = field(
-        metadata=field_options(alias="currentSource"), default="1"
+    enabled: bool = field(
+        metadata=field_options(serialization_strategy=RussoundBool()), default=False
+    )
+    current_source: int = field(
+        metadata=field_options(
+            alias="currentSource", serialization_strategy=RussoundInt()
+        ),
+        default=1,
     )
     enabled_sources: list[int] = field(
         metadata=field_options(alias="enabled_sources"), default_factory=list
     )
 
 
+class SourceType(StrEnum):
+    """Russound source types."""
+
+    AMPLIFIER = "Amplifier"
+    TELEVISION = "Television"
+    CABLE = "Cable"
+    VIDEO_ACCESSORY = "Video Accessory"
+    SATELLITE = "Satellite"
+    VCR = "VCR"
+    BLURAY_DVD = "Blu-ray / DVD"
+    RECEIVER = "Receiver"
+    MISC_AUDIO = "Misc Audio"
+    CD = "CD"
+    HOME_CONTROL = "Home Control"
+    RUSSOUND_MEDIA_STREAMER = "Russound Media Streamer"
+    RUSSOUND_DMS_3_1_AM_FM_TUNER = "Russound DMS 3.1 AM/FM Tuner"
+    RUSSOUND_ST_1_AM_FM_TUNER = "Russound ST.1 AM/FM Tuner"
+    RUSSOUND_BLUETOOTH_MODULE = "Russound Bluetooth Module"
+
+
+class SourceMode(StrEnum):
+    """Russound source modes."""
+
+    UNKNOWN = "Unknown"
+    AIRPLAY = "AirPlay"
+    SPOTIFY = "Spotify"
+    PANDORA = "Pandora"
+    SIRIUS_XM = "SiriusXM"
+    TUNE_IN = "TuneIn"
+    INTERNET_RADIO = "Internet Radio"
+    MEDIA_SERVER = "Media Server"
+    USB = "USB"
+    AIRABLE_RADIO = "Airable Radio"
+    DEEZER = "Deezer"
+    TIDAL = "Tidal"
+    NAPSTER = "Napster"
+    CHROMECAST = "Chromecast"
+    BLUETOOTH = "Bluetooth"
+
+
+class RepeatMode(StrEnum):
+    """Repeat mode."""
+
+    OFF = "OFF"
+    ALL = "ALL"
+    SINGLE = "SINGLE"
+
+
+class PlayStatus(StrEnum):
+    """Play status"""
+
+    PLAYING = "playing"
+    PAUSED = "paused"
+    STOPPED = "stopped"
+    TRANSITIONING = "transitioning"
+
+
 @dataclass
 class Source(DataClassORJSONMixin):
     """Data class representing Russound source."""
 
-    name: str = field(metadata=field_options(alias="name"), default=None)
-    type: str = field(metadata=field_options(alias="type"), default=None)
-    channel: str = field(metadata=field_options(alias="channel"), default=None)
-    cover_art_url: str = field(
+    name: str = field(default=None)
+    type: SourceType = field(
+        metadata={"deserialize": lambda v: SourceType.MISC_AUDIO if not v else v},
+        default=SourceType.MISC_AUDIO,
+    )
+    channel: Optional[str] = field(default=None)
+    cover_art_url: Optional[str] = field(
         metadata=field_options(alias="coverArtURL"), default=None
     )
-    channel_name: str = field(metadata=field_options(alias="channelName"), default=None)
-    genre: str = field(metadata=field_options(alias="genre"), default=None)
-    artist_name: str = field(metadata=field_options(alias="artistName"), default=None)
-    album_name: str = field(metadata=field_options(alias="albumName"), default=None)
-    playlist_name: str = field(
+    channel_name: Optional[str] = field(
+        metadata=field_options(alias="channelName"), default=None
+    )
+    genre: Optional[str] = field(default=None)
+    artist_name: Optional[str] = field(
+        metadata=field_options(alias="artistName"), default=None
+    )
+    album_name: Optional[str] = field(
+        metadata=field_options(alias="albumName"), default=None
+    )
+    playlist_name: Optional[str] = field(
         metadata=field_options(alias="playlistName"), default=None
     )
-    song_name: str = field(metadata=field_options(alias="songName"), default=None)
-    program_service_name: str = field(
+    song_name: Optional[str] = field(
+        metadata=field_options(alias="songName"), default=None
+    )
+    program_service_name: Optional[str] = field(
         metadata=field_options(alias="programServiceName"), default=None
     )
-    radio_text: str = field(metadata=field_options(alias="radioText"), default=None)
-    shuffle_mode: str = field(metadata=field_options(alias="shuffleMode"), default=None)
-    repeat_mode: str = field(metadata=field_options(alias="repeatMode"), default=None)
-    mode: str = field(metadata=field_options(alias="mode"), default=None)
-    play_status: str = field(metadata=field_options(alias="playStatus"), default=None)
-    sample_rate: str = field(metadata=field_options(alias="sampleRate"), default=None)
-    bit_rate: str = field(metadata=field_options(alias="bitRate"), default=None)
-    bit_depth: str = field(metadata=field_options(alias="bitDepth"), default=None)
-    play_time: str = field(metadata=field_options(alias="playTime"), default=None)
-    track_time: str = field(metadata=field_options(alias="trackTime"), default=None)
+    radio_text: Optional[str] = field(
+        metadata=field_options(alias="radioText"), default=None
+    )
+    shuffle_mode: bool = field(
+        metadata=field_options(
+            alias="shuffleMode", serialization_strategy=RussoundBool()
+        ),
+        default=False,
+    )
+    repeat_mode: Optional[RepeatMode] = field(
+        metadata=field_options(alias="repeatMode"), default=None
+    )
+    mode: SourceMode = field(
+        metadata={"deserialize": lambda v: SourceMode.UNKNOWN if not v else v},
+        default=SourceMode.UNKNOWN,
+    )
+    play_status: Optional[PlayStatus] = field(
+        metadata=field_options(alias="playStatus"), default=None
+    )
+    sample_rate: Optional[int] = field(
+        metadata=field_options(
+            alias="sampleRate", serialization_strategy=RussoundInt()
+        ),
+        default=None,
+    )
+    bit_rate: Optional[int] = field(
+        metadata=field_options(alias="bitRate", serialization_strategy=RussoundInt()),
+        default=None,
+    )
+    bit_depth: Optional[int] = field(
+        metadata=field_options(alias="bitDepth", serialization_strategy=RussoundInt()),
+        default=None,
+    )
+    play_time: Optional[int] = field(
+        metadata=field_options(alias="playTime", serialization_strategy=RussoundInt()),
+        default=None,
+    )
+    track_time: Optional[int] = field(
+        metadata=field_options(alias="trackTime", serialization_strategy=RussoundInt()),
+        default=None,
+    )
 
 
 class CallbackType(StrEnum):
