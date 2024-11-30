@@ -6,6 +6,7 @@ from collections import defaultdict
 from enum import Enum
 import re
 
+
 MINIMUM_API_SUPPORT = "1.05.00"
 
 DEFAULT_PORT = 9621
@@ -16,6 +17,9 @@ TIMEOUT = 5.0
 KEEP_ALIVE_INTERVAL = 60
 
 MAX_SOURCE = 17
+MAX_SYSTEM_FAVORITES = 32
+
+SYSTEM_KEY = "System"
 
 MAX_RNET_CONTROLLERS = 6
 

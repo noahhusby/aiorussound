@@ -9,6 +9,7 @@ from aiorussound.exceptions import UnsupportedFeatureError
 from aiorussound.util import (
     controller_device_str,
     get_max_zones,
+    get_max_zones_favorites,
     is_feature_supported,
     is_fw_version_higher,
     raise_unsupported_feature,
@@ -84,3 +85,22 @@ def test_source_device_str(source_id: int, result: str) -> None:
 def test_get_max_zones(model: str, max_zones: int) -> None:
     """Test if the maximum number of zones is correct."""
     assert get_max_zones(model) == max_zones
+
+   
+@pytest.mark.parametrize(
+    "model_favorites,max_zone_favorites",
+    [
+        ("MCA-C5", 4),
+        ("MCA-88", 4),
+        ("MCA-66", 4),
+        ("MCA-C3", 4),
+        ("MBX-PRE", 4),
+        ("XSource", 2),
+        ("XZone4", 2),
+        ("XZone70V",2),
+        ("Other", 0),
+    ],
+)
+def test_get_max_zones_favorites(model_favorites: str, max_zone_favorites: int) -> None:
+    """Test if the maximum number of zone favorites is correct."""
+    assert get_max_zones_favorites(model_favorites) == max_zone_favorites

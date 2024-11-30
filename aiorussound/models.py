@@ -22,6 +22,18 @@ class RussoundInt(SerializationStrategy):
 
 
 @dataclass
+class Favorite:
+    """Russound Favorite."""
+
+    favorite_id: int
+    is_system_favorite: bool
+    name: str
+    provider_mode: str
+    album_cover_url: str
+    source_id: int
+
+
+@dataclass
 class Zone(DataClassORJSONMixin):
     """Data class representing Russound state."""
 
