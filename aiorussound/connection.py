@@ -6,6 +6,7 @@ from typing import Optional
 
 from aiorussound.const import (
     DEFAULT_PORT,
+    TIMEOUT,
 )
 
 _LOGGER = logging.getLogger(__package__)
@@ -38,7 +39,8 @@ class RussoundTcpConnectionHandler(RussoundConnectionHandler):
 
     async def connect(self) -> None:
         _LOGGER.debug("Connecting to %s:%s", self.host, self.port)
-        reader, writer = await asyncio.open_connection(self.host, self.port)
+        async with asyncio.timeout(TIMEOUT):
+            reader, writer = await asyncio.open_connection(self.host, self.port)
         self.reader = reader
         self.writer = writer
 
