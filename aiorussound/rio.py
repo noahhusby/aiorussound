@@ -463,6 +463,10 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
         """Unmute the zone."""
         return await self.send_event("ZoneMuteOff")
 
+    async def toggle_mute(self) -> str:
+        """Toggle the mute state of the zone."""
+        return await self.send_event("KeyRelease", "Mute")
+
     async def set_volume(self, volume: str) -> str:
         """Set the volume."""
         return await self.send_event("KeyPress", "Volume", volume)
