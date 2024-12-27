@@ -8,12 +8,15 @@ from asyncio import Future, Task, AbstractEventLoop, Queue
 from dataclasses import field, dataclass
 from typing import Any, Coroutine, Optional
 
+
 from aiorussound.connection import RussoundConnectionHandler
 from aiorussound.const import (
     FLAGS_BY_VERSION,
     MAX_SOURCE,
     MINIMUM_API_SUPPORT,
     FeatureFlag,
+    SYSTEM_KEY,
+    MAX_SYSTEM_FAVORITES,
     MAX_RNET_CONTROLLERS,
     RESPONSE_REGEX,
     KEEP_ALIVE_INTERVAL,
@@ -30,9 +33,12 @@ from aiorussound.models import (
     Source,
     Zone,
     MessageType,
+    Favorite,
 )
+
 from aiorussound.util import (
     controller_device_str,
+    get_max_zones_favorites,
     is_feature_supported,
     is_fw_version_higher,
     source_device_str,
@@ -437,6 +443,53 @@ class RussoundClient:
                     flags.append(flag)
         return flags
 
+    async def enumerate_system_favorites(self) -> list[Favorite]:
+        """Return a list of Favorite for this system."""
+        favorites = []
+
+        for favorite_id in range(1, MAX_SYSTEM_FAVORITES):
+            try:
+                valid = await self._get_system_favorite_variable(favorite_id, "valid")
+                if valid == "TRUE":
+                    try:
+                        name = await self._get_system_favorite_variable(
+                            favorite_id, "name"
+                        )
+                        providerMode = await self._get_system_favorite_variable(
+                            favorite_id, "providerMode"
+                        )
+                        albumCoverURL = await self._get_system_favorite_variable(
+                            favorite_id, "albumCoverURL"
+                        )
+                        source_id = await self._get_system_favorite_variable(
+                            favorite_id, "source"
+                        )
+
+                        favorites.append(
+                            Favorite(
+                                favorite_id,
+                                True,
+                                name,
+                                providerMode,
+                                albumCoverURL,
+                                source_id,
+                            )
+                        )
+                    except CommandError:
+                        break
+            except CommandError:
+                continue
+        return favorites
+
+    async def _get_system_favorite_variable(self, favorite_id, variable) -> str:
+        """Return a system favorite variable."""
+        try:
+            return await self.get_variable(
+                SYSTEM_KEY, f"favorite[{favorite_id}].{variable}"
+            )
+        except RussoundError:
+            return "False"
+
 
 class AbstractControlSurface:
     def __init__(self):
@@ -510,6 +563,126 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
     async def select_source(self, source: int) -> str:
         """Select a source."""
         return await self.send_event("SelectSource", source)
+
+    async def enumerate_favorites(self) -> list[Favorite]:
+        """Return a list of Favorite for this zone."""
+        favorites = []
+        max_zone_favorites = get_max_zones_favorites(
+            self.client.controllers[1].controller_type
+        )
+
+        if max_zone_favorites > 0:
+            for favorite_id in range(1, max_zone_favorites):
+                try:
+                    valid = await self.client.get_variable(
+                        self.device_str, f"favorite[{favorite_id}].valid"
+                    )
+                    if valid == "TRUE":
+                        try:
+                            name = await self.client.get_variable(
+                                self.device_str, f"favorite[{favorite_id}].name"
+                            )
+                            providerMode = await self.client.get_variable(
+                                self.device_str, f"favorite[{favorite_id}].providerMode"
+                            )
+                            albumCoverURL = await self.client.get_variable(
+                                self.device_str,
+                                f"favorite[{favorite_id}].albumCoverURL",
+                            )
+                            source_id = await self.client.get_variable(
+                                self.device_str, f"favorite[{favorite_id}].source"
+                            )
+
+                            favorites.append(
+                                Favorite(
+                                    favorite_id,
+                                    False,
+                                    name,
+                                    providerMode,
+                                    albumCoverURL,
+                                    source_id,
+                                )
+                            )
+                        except CommandError:
+                            break
+                except CommandError:
+                    continue
+        return favorites
+
+    async def save_system_favorite(self, favorite_id: int, favorite_name=None) -> None:
+        """Save system favorite to controller."""
+        if favorite_name is None:
+            # default to channel name if no name is provided
+            favorite_name = self.client.sources[int(self.current_source)].channel_name
+
+        if favorite_name is None:
+            # if no channel name, set a default name
+            favorite_name = f"F{favorite_id}"
+
+        if favorite_id >= 1 and favorite_id <= MAX_SYSTEM_FAVORITES:
+            _LOGGER.debug("Saving system favorite %d", favorite_id)
+            await self.send_event(
+                "saveSystemFavorite", f'"{favorite_name}"', favorite_id
+            )
+        else:
+            raise RussoundError
+
+    async def save_zone_favorite(self, favorite_id: int, favorite_name=None) -> None:
+        """Save zone favorite to contoller."""
+        if favorite_name is None:
+            # default to channel name if no name is provided
+            favorite_name = self.client.sources[int(self.current_source)].channel_name
+
+        if favorite_name is None:
+            # if no channel name, set a default name
+            favorite_name = f"F{favorite_id}"
+
+        if favorite_id >= 1 and favorite_id <= get_max_zones_favorites(
+            self.client.controllers[1].controller_type
+        ):
+            _LOGGER.debug("Saving zone favorite %d", favorite_id)
+            await self.send_event("saveZoneFavorite", f'"{favorite_name}"', favorite_id)
+        else:
+            raise RussoundError
+
+    async def delete_system_favorite(self, favorite_id: int) -> None:
+        """Delete system favorite from contoller."""
+        self.delete_system_favorite(favorite_id)
+
+        if favorite_id >= 1 and favorite_id <= MAX_SYSTEM_FAVORITES:
+            _LOGGER.debug("Removing system favorite %d", favorite_id)
+            await self.send_event("deleteSystemFavorite", favorite_id)
+        else:
+            raise RussoundError
+
+    async def delete_zone_favorite(self, favorite_id: int) -> None:
+        """Delete zone favorite from contoller."""
+
+        if favorite_id >= 1 and favorite_id <= get_max_zones_favorites(
+            self.client.controllers[1].controller_type
+        ):
+            _LOGGER.debug("Removing zone favorite %d", favorite_id)
+            await self.send_event("deleteZoneFavorite", favorite_id)
+        else:
+            raise RussoundError
+
+    async def restore_system_favorite(self, favorite_id: int) -> None:
+        """Change to system favorite from contoller for this zone."""
+
+        if favorite_id >= 1 and favorite_id <= MAX_SYSTEM_FAVORITES:
+            await self.send_event("restoreSystemFavorite", favorite_id)
+        else:
+            raise RussoundError
+
+    async def restore_zone_favorite(self, favorite_id: int) -> None:
+        """Change to zone favorite from contoller for this zone."""
+
+        if favorite_id >= 1 and favorite_id <= get_max_zones_favorites(
+            self.client.controllers[1].controller_type
+        ):
+            await self.send_event("restoreZoneFavorite", favorite_id)
+        else:
+            raise RussoundError
 
 
 @dataclass
