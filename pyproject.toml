@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aiorussound"
-version = "4.2.0"
+version = "4.3.0"
 description = "Asyncio client for Russound RIO devices."
 authors = ["Noah Husby <opensource@husbylabs.com>"]
 maintainers = ["Noah Husby <opensource@husbylabs.com>"]
