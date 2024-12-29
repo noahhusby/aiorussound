@@ -180,54 +180,7 @@ class RussoundClient:
                     if controller:
                         self.controllers[controller_id] = controller
 
-            subscribe_state_updates = {
-                self.subscribe(self._async_handle_system, "System")
-            }
-
-            # Load source structure
-            for source_id in range(1, MAX_SOURCE):
-                try:
-                    device_str = source_device_str(source_id)
-                    name = await self.get_variable(device_str, "name")
-                    if name:
-                        subscribe_state_updates.add(
-                            self.subscribe(self._async_handle_source, device_str)
-                        )
-                except CommandError:
-                    break
-
-            for controller_id, controller in self.controllers.items():
-                for zone_id in range(1, get_max_zones(controller.controller_type) + 1):
-                    try:
-                        device_str = zone_device_str(controller_id, zone_id)
-                        name = await self.get_variable(device_str, "name")
-                        if name:
-                            subscribe_state_updates.add(
-                                self.subscribe(self._async_handle_zone, device_str)
-                            )
-                    except CommandError:
-                        break
-
-            subscribe_tasks = set()
-            for state_update in subscribe_state_updates:
-                subscribe_tasks.add(asyncio.create_task(state_update))
-            await asyncio.wait(subscribe_tasks)
-
-            if is_feature_supported(
-                self.rio_version, FeatureFlag.SUPPORT_ZONE_SOURCE_EXCLUSION
-            ):
-                _LOGGER.debug(
-                    "Zone source exclusion is supported. Fetching excluded sources."
-                )
-                await self._load_zone_source_exclusion()
-                # Reload zones from state
-                await self._async_handle_zone()
-
             self._do_state_update = True
-            await self.do_state_update_callbacks(CallbackType.CONNECTION)
-
-            # Delay to ensure async TTL
-            await asyncio.sleep(0.2)
             self._attempt_reconnection = True
             if not res.done():
                 res.set_result(True)
@@ -258,6 +211,55 @@ class RussoundClient:
                         await asyncio.shield(closeout_task)
                     except asyncio.CancelledError:
                         pass
+
+    async def load_zone_source_metadata(self) -> None:
+        """Fetches and subscribes to all the zone and source metadata"""
+
+        subscribe_state_updates = {self.subscribe(self._async_handle_system, "System")}
+
+        # Load source structure
+        for source_id in range(1, MAX_SOURCE):
+            try:
+                device_str = source_device_str(source_id)
+                name = await self.get_variable(device_str, "name")
+                if name:
+                    subscribe_state_updates.add(
+                        self.subscribe(self._async_handle_source, device_str)
+                    )
+            except CommandError:
+                break
+
+        for controller_id, controller in self.controllers.items():
+            for zone_id in range(1, get_max_zones(controller.controller_type) + 1):
+                try:
+                    device_str = zone_device_str(controller_id, zone_id)
+                    name = await self.get_variable(device_str, "name")
+                    if name:
+                        subscribe_state_updates.add(
+                            self.subscribe(self._async_handle_zone, device_str)
+                        )
+                except CommandError:
+                    break
+
+        subscribe_tasks = set()
+        for state_update in subscribe_state_updates:
+            subscribe_tasks.add(asyncio.create_task(state_update))
+        await asyncio.wait(subscribe_tasks)
+
+        if is_feature_supported(
+            self.rio_version, FeatureFlag.SUPPORT_ZONE_SOURCE_EXCLUSION
+        ):
+            _LOGGER.debug(
+                "Zone source exclusion is supported. Fetching excluded sources."
+            )
+            await self._load_zone_source_exclusion()
+            # Reload zones from state
+            await self._async_handle_zone()
+
+        await self.do_state_update_callbacks(CallbackType.STATE)
+
+        # Delay to ensure async TTL
+        await asyncio.sleep(0.5)
 
     @staticmethod
     def process_response(res: bytes) -> Optional[RussoundMessage]:
