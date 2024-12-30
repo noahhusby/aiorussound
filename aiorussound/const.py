@@ -160,3 +160,8 @@ VERSIONS_BY_FLAGS = defaultdict(list)
 for version, flags in FLAGS_BY_VERSION.items():
     for flag in flags:
         VERSIONS_BY_FLAGS[flag] = version
+
+CONTROLLER_TYPE_FIX_MAP = {
+    "MCA-C6": "MCA-C5",
+    "XStream-X5": "XSource",
+}
