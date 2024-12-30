@@ -17,7 +17,7 @@ from aiorussound.const import (
     MAX_RNET_CONTROLLERS,
     RESPONSE_REGEX,
     KEEP_ALIVE_INTERVAL,
-    TIMEOUT,
+    TIMEOUT, CONTROLLER_TYPE_FIX_MAP,
 )
 from aiorussound.exceptions import (
     CommandError,
@@ -377,6 +377,8 @@ class RussoundClient:
             controller_type = await self.get_variable(device_str, "type")
             if not controller_type:
                 return None
+            if controller_type in CONTROLLER_TYPE_FIX_MAP:
+                controller_type = CONTROLLER_TYPE_FIX_MAP[controller_type]
             mac_address = None
             try:
                 mac_address = await self.get_variable(device_str, "macAddress")
