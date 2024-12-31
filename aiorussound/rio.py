@@ -17,7 +17,8 @@ from aiorussound.const import (
     MAX_RNET_CONTROLLERS,
     RESPONSE_REGEX,
     KEEP_ALIVE_INTERVAL,
-    TIMEOUT, CONTROLLER_TYPE_FIX_MAP,
+    TIMEOUT,
+    CONTROLLER_TYPE_FIX_MAP,
 )
 from aiorussound.exceptions import (
     CommandError,
@@ -514,6 +515,14 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
     async def select_source(self, source: int) -> str:
         """Select a source."""
         return await self.send_event("SelectSource", source)
+
+    async def set_seek_time(self, time: int) -> None:
+        """Seek to the specified time."""
+        if time < 0:
+            raise RussoundError("Seek time cannot be negative")
+        elif time > self.fetch_current_source().track_time:
+            raise RussoundError("Seek time cannot be greater than current track time")
+        await self.send_event("SetSeekTime", time)
 
 
 @dataclass

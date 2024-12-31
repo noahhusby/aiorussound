@@ -7,6 +7,7 @@ from typing import Optional
 from mashumaro import field_options
 from mashumaro.mixins.orjson import DataClassORJSONMixin
 from mashumaro.types import SerializationStrategy
+from datetime import datetime, UTC
 
 
 class RussoundBool(SerializationStrategy):
@@ -232,6 +233,8 @@ class Source(DataClassORJSONMixin):
         metadata=field_options(alias="trackTime", serialization_strategy=RussoundInt()),
         default=None,
     )
+    position_last_updated: datetime = datetime.now(UTC)
+
 
 
 class CallbackType(StrEnum):
