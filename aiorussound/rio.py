@@ -524,6 +524,11 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
             raise RussoundError("Seek time cannot be greater than current track time")
         await self.send_event("SetSeekTime", time)
 
+    async def set_loudness(self, loudness: bool) -> None:
+        """Set the loudness of the zone."""
+        cmd = f"SET {self.device_str}.loudness {'ON' if loudness else 'OFF'}"
+        return await self.client.request(cmd)
+
 
 @dataclass
 class Controller:
