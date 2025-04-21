@@ -526,8 +526,9 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
 
     async def set_loudness(self, loudness: bool) -> None:
         """Set the loudness of the zone."""
-        cmd = f"SET {self.device_str}.loudness {'ON' if loudness else 'OFF'}"
-        return await self.client.request(cmd)
+        await self.client.set_variable(
+            self.device_str, "loudness", "ON" if loudness else "OFF"
+        )
 
 
 @dataclass
