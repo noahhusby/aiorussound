@@ -363,7 +363,7 @@ class RussoundClient:
         self, device_str: str, key: str, value: str
     ) -> Coroutine[Any, Any, str]:
         """Set a zone variable to a new value."""
-        return self.request(f'SET {device_str}.{key}="{value}"')
+        return await self.request(f'SET {device_str}.{key}="{value}"')
 
     async def get_variable(self, device_str: str, key: str) -> str:
         """Retrieve the current value of a zone variable.  If the variable is
