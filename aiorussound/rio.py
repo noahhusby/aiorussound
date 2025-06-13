@@ -530,6 +530,32 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
             self.device_str, "loudness", "ON" if loudness else "OFF"
         )
 
+    async def set_bass(self, bass: int) -> None:
+        """Set the bass of the zone."""
+        if bass < -10 or bass > 10:
+            raise RussoundError("Bass must be between -10 and 10")
+        await self.client.set_variable(self.device_str, "bass", str(bass))
+
+    async def set_treble(self, treble: int) -> None:
+        """Set the treble of the zone."""
+        if treble < -10 or treble > 10:
+            raise RussoundError("Treble must be between -10 and 10")
+        await self.client.set_variable(self.device_str, "treble", str(treble))
+
+    async def set_balance(self, balance: int) -> None:
+        """Set the treble of the zone."""
+        if balance < -10 or balance > 10:
+            raise RussoundError("Balance must be between -10 and 10")
+        await self.client.set_variable(self.device_str, "balance", str(balance))
+
+    async def set_turn_on_volume(self, turn_on_volume: int) -> None:
+        """Set the turn on volume of the zone."""
+        if turn_on_volume < 0 or turn_on_volume > 50:
+            raise RussoundError("Turn on volume must be between 0 and 50")
+        await self.client.set_variable(
+            self.device_str, "turn_on_volume", str(turn_on_volume)
+        )
+
 
 @dataclass
 class Controller:
