@@ -553,7 +553,7 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
         if turn_on_volume < 0 or turn_on_volume > 50:
             raise RussoundError("Turn on volume must be between 0 and 50")
         await self.client.set_variable(
-            self.device_str, "turn_on_volume", str(turn_on_volume)
+            self.device_str, "turnOnVolume", str(turn_on_volume)
         )
 
 
