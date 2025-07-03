@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aiorussound"
-version = "4.6.1"
+version = "4.7.0"
 description = "Asyncio client for Russound RIO devices."
 authors = ["Noah Husby <opensource@husbylabs.com>"]
 maintainers = ["Noah Husby <opensource@husbylabs.com>"]
@@ -15,6 +15,7 @@ documentation = "https://github.com/noahhusby/aiorussound"
 python = "^3.11"
 mashumaro = "^3.11"
 orjson = ">=3.9.0"
+pyserial-asyncio-fast = "^0.16"
 
 [tool.poetry.group.dev.dependencies]
 coverage = {version = "7.9.1"}
