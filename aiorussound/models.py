@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Optional
+from typing import Optional, Dict
 
 from mashumaro import field_options
 from mashumaro.mixins.orjson import DataClassORJSONMixin
@@ -233,8 +233,11 @@ class Source(DataClassORJSONMixin):
         metadata=field_options(alias="trackTime", serialization_strategy=RussoundInt()),
         default=None,
     )
+    presets: Optional[Dict[int, str]] = field(
+        metadata=field_options(alias="presets"),
+        default_factory=dict,
+    )
     position_last_updated: datetime = datetime.now(UTC)
-
 
 
 class CallbackType(StrEnum):

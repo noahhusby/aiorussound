@@ -27,6 +27,7 @@ async def main():
 
     await client.register_state_update_callbacks(on_state_change)
     await client.connect()
+    await client.load_zone_source_metadata()
 
     for s_id, source in client.sources.items():
         print(f"Found source {s_id} - {source.name}")
