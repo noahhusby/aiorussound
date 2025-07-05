@@ -413,7 +413,7 @@ class RussoundClient:
         """Loads whether a source is available to a specific zone."""
         for controller_id, controller in self.controllers.items():
             for zone_id in controller.zones.keys():
-                for source_id in self.sources.keys():
+                for source_id in list(self.sources.keys()):
                     try:
                         enabled = await self.get_variable(
                             f"C[{controller_id}].Z[{zone_id}].S[{source_id}]", "enabled"
