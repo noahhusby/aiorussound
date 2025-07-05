@@ -596,6 +596,12 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
             self.device_str, "turnOnVolume", str(turn_on_volume)
         )
 
+    async def restore_preset(self, preset_id: int) -> None:
+        """Restore the preset of the zone."""
+        if preset_id < 1 or preset_id > 36:
+            raise RussoundError("Preset ID must be between 1 and 36")
+        await self.send_event("RestorePreset", preset_id)
+
 
 @dataclass
 class Controller:
