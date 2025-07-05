@@ -20,6 +20,18 @@ MAX_SOURCE = 17
 
 MAX_RNET_CONTROLLERS = 6
 
+PRESET_COMPATIBLE_SOURCES = [
+    "RNET AM/FM Tuner (Internal)",
+    "RNET XM Tuner (Internal)",
+    "RNET Sirius Tuner (Internal)",
+    "RNET AM/FM Tuner (External)",
+    "RNET XM Tuner (External)",
+    "RNET Sirius Tuner (External)",
+    "DMS-3.1 AM/FM Tuner",
+]
+TOTAL_BANKS = 6
+TOTAL_PRESETS_PER_BANK = 6
+
 RESPONSE_REGEX = re.compile(
     r'(?:(\w+(?:\[\d+])?(?:\.\w+(?:\[\d+])?)*)\.)?(\w+)="([^"]*)"'
 )

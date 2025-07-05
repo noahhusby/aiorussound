@@ -19,6 +19,9 @@ from aiorussound.const import (
     KEEP_ALIVE_INTERVAL,
     TIMEOUT,
     CONTROLLER_TYPE_FIX_MAP,
+    PRESET_COMPATIBLE_SOURCES,
+    TOTAL_BANKS,
+    TOTAL_PRESETS_PER_BANK,
 )
 from aiorussound.exceptions import (
     CommandError,
@@ -216,6 +219,7 @@ class RussoundClient:
     async def load_zone_source_metadata(self) -> None:
         """Fetches and subscribes to all the zone and source metadata"""
 
+        self._do_state_update = False
         subscribe_state_updates = {self.subscribe(self._async_handle_system, "System")}
 
         # Load source structure
@@ -257,10 +261,14 @@ class RussoundClient:
             # Reload zones from state
             await self._async_handle_zone()
 
-        await self.do_state_update_callbacks(CallbackType.STATE)
+        _LOGGER.debug("Fetching source preset metadata.")
+        await self._load_source_presets()
+        await self._async_handle_source()
 
         # Delay to ensure async TTL
         await asyncio.sleep(0.5)
+        self._do_state_update = True
+        await self.do_state_update_callbacks(CallbackType.STATE)
 
     @staticmethod
     def process_response(res: bytes) -> Optional[RussoundMessage]:
@@ -432,6 +440,38 @@ class RussoundClient:
                             "enabled_sources"
                         ].append(source_id)
 
+    async def _load_source_presets(self) -> None:
+        """Load presets for tuner-based sources."""
+        for source_id, source in list(self.sources.items()):
+            if source.type not in PRESET_COMPATIBLE_SOURCES:
+                _LOGGER.debug(
+                    f"Source {source_id} of type {source.type} does not support presets..."
+                )
+                continue
+            no_preset_key_for_type = False
+            for bank in range(1, TOTAL_BANKS + 1):
+                for preset in range(1, TOTAL_PRESETS_PER_BANK + 1):
+                    try:
+                        valid = await self.get_variable(
+                            f"S[{source_id}].B[{bank}].P[{preset}]", "valid"
+                        )
+                    except CommandError:
+                        no_preset_key_for_type = True
+                        _LOGGER.warning(
+                            f"Preset key cannot be found for source type {source.type}. Please open a bug report and share this error..."
+                        )
+                        break
+                    if valid == "TRUE":
+                        name = await self.get_variable(
+                            f"S[{source_id}].B[{bank}].P[{preset}]", "name"
+                        )
+                        preset_id = (bank - 1) * 6 + preset
+                        if "presets" not in self.state["S"][source_id]:
+                            self.state["S"][source_id]["presets"] = {}
+                        self.state["S"][source_id]["presets"][preset_id] = name
+                if no_preset_key_for_type:
+                    break
+
     @property
     def supported_features(self) -> list[FeatureFlag]:
         """Gets a list of features supported by the controller."""
@@ -555,6 +595,12 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
         await self.client.set_variable(
             self.device_str, "turnOnVolume", str(turn_on_volume)
         )
+
+    async def restore_preset(self, preset_id: int) -> None:
+        """Restore the preset of the zone."""
+        if preset_id < 1 or preset_id > 36:
+            raise RussoundError("Preset ID must be between 1 and 36")
+        await self.send_event("RestorePreset", preset_id)
 
 
 @dataclass
