@@ -158,6 +158,7 @@ class PlayStatus(StrEnum):
     PAUSED = "paused"
     STOPPED = "stopped"
     TRANSITIONING = "transitioning"
+    LOADING = "loading"
 
 
 @dataclass
