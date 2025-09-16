@@ -19,7 +19,7 @@ pyserial-asyncio-fast = "^0.16"
 
 [tool.poetry.group.dev.dependencies]
 coverage = {version = "7.10.6"}
-mypy = "1.17.1"
+mypy = "1.18.1"
 pre-commit = "4.3.0"
 pre-commit-hooks = "6.0.0"
 pylint = "3.3.8"
