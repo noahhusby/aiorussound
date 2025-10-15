@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from abc import abstractmethod
-from asyncio import StreamReader
+from asyncio import StreamReader, StreamWriter
 from typing import Optional
 
 import serial_asyncio_fast
@@ -18,10 +18,13 @@ _LOGGER = logging.getLogger(__package__)
 class RussoundConnectionHandler:
     def __init__(self) -> None:
         self.reader: Optional[StreamReader] = None
+        self.writer: Optional[StreamWriter] = None
 
     async def send(self, cmd: str) -> None:
         """Send a command to the Russound client."""
-        pass
+        self.writer.write(bytearray(f"{cmd}\r", "utf-8"))
+        await self.writer.drain()
+
         # if not self.connected:
         #     raise CommandError("Not connected to device.")
 
@@ -38,7 +41,6 @@ class RussoundTcpConnectionHandler(RussoundConnectionHandler):
         super().__init__()
         self.host = host
         self.port = port
-        self.writer = None
 
     async def connect(self) -> None:
         _LOGGER.debug("Connecting to %s:%s", self.host, self.port)
@@ -47,12 +49,6 @@ class RussoundTcpConnectionHandler(RussoundConnectionHandler):
         self.reader = reader
         self.writer = writer
 
-    async def send(self, cmd: str) -> None:
-        """Send a command to the Russound client."""
-        await super().send(cmd)
-        self.writer.write(bytearray(f"{cmd}\r", "utf-8"))
-        await self.writer.drain()
-
 
 class RussoundSerialConnectionHandler(RussoundConnectionHandler):
     def __init__(self, port: str, baudrate: int = DEFAULT_BAUDRATE) -> None:
@@ -60,7 +56,6 @@ class RussoundSerialConnectionHandler(RussoundConnectionHandler):
         super().__init__()
         self.port = port
         self.baudrate = baudrate
-        self.writer = None
 
     async def connect(self) -> None:
         _LOGGER.debug("Connecting to %s (baudrate: %s)", self.port, self.baudrate)
@@ -69,9 +64,3 @@ class RussoundSerialConnectionHandler(RussoundConnectionHandler):
                 url=self.port,
                 baudrate=self.baudrate,
             )
-
-    async def send(self, cmd: str) -> None:
-        """Send a command to the Russound client."""
-        await super().send(cmd)
-        self.writer.write(bytearray(f"{cmd}\r", "utf-8"))
-        await self.writer.drain()

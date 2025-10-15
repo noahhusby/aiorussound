@@ -1,6 +1,6 @@
 [project]
 name = "aiorussound"
-version = "4.8.2"
+version = "4.9.0"
 description = "Asyncio client for Russound RIO devices."
 authors = [
     { name = "Noah Husby", email = "opensource@husbylabs.com" }
