@@ -1,37 +1,74 @@
-[tool.poetry]
+[project]
 name = "aiorussound"
 version = "4.8.2"
 description = "Asyncio client for Russound RIO devices."
-authors = ["Noah Husby <opensource@husbylabs.com>"]
-maintainers = ["Noah Husby <opensource@husbylabs.com>"]
+authors = [
+    { name = "Noah Husby", email = "opensource@husbylabs.com" }
+]
+maintainers = [
+    { name = "Noah Husby", email = "opensource@husbylabs.com" }
+]
 license = "MIT"
 readme = "README.md"
+
+requires-python = ">=3.11"
+dependencies = [
+    "mashumaro>=3.17",
+    "orjson>=3.9.0",
+    "pyserial-asyncio-fast>=0.16"
+]
+
+[project.urls]
 homepage = "https://github.com/noahhusby/aiorussound"
 repository = "https://github.com/noahhusby/aiorussound"
 documentation = "https://github.com/noahhusby/aiorussound"
 
+[project.optional-dependencies]
+dev = [
+    "coverage==7.10.6",
+    "mypy==1.18.1",
+    "pre-commit==4.3.0",
+    "pre-commit-hooks==6.0.0",
+    "pylint==4.0.0",
+    "pytest==8.4.2",
+    "pytest-asyncio==1.2.0",
+    "pytest-cov==7.0.0",
+    "ruff==0.14.0"
+]
+docs = [
+    "pdoc>=14.7,<16.0"
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-mashumaro = ">=3.17"
-orjson = ">=3.9.0"
-pyserial-asyncio-fast = "^0.16"
+[tool.mypy]
+# Specify the target platform details in config, so your developers are
+# free to run mypy on Windows, Linux, or macOS and get consistent
+# results.
+platform = "linux"
+python_version = "3.11"
 
-[tool.poetry.group.dev.dependencies]
-coverage = {version = "7.10.6"}
-mypy = "1.18.1"
-pre-commit = "4.3.0"
-pre-commit-hooks = "6.0.0"
-pylint = "4.0.0"
-pytest = "8.4.2"
-pytest-asyncio = "1.2.0"
-pytest-cov = "7.0.0"
-ruff = "0.14.0"
+# show error messages from unrelated files
+follow_imports = "normal"
 
-[tool.poetry.group.docs.dependencies]
-pdoc = ">=14.7,<16.0"
+# suppress errors about unsatisfied imports
+ignore_missing_imports = true
 
+# be strict
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+strict_optional = true
+warn_incomplete_stub = true
+warn_no_return = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unused_configs = true
+warn_unused_ignores = true
 
 [build-system]
-build-backend = "poetry.core.masonry.api"
 requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
