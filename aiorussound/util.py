@@ -64,11 +64,17 @@ def source_device_str(source_id: int) -> str:
 
 def get_max_zones(model: str) -> int:
     """Return a maximum number of zones supported by a specific controller."""
-    if model in ("SMZ8", "MCA-88", "MCA-88X", "MCA-C5"):
-        return 8
-    if model in ("MCA-66", "MCA-C3"):
-        return 6
-    return 1
+    zone_counts = {
+        "SMZ16-PRE": 16,
+        "SMZ16": 16,
+        "SMZ8": 8,
+        "MCA-88": 8,
+        "MCA-88X": 8,
+        "MCA-C5": 8,
+        "MCA-66": 6,
+        "MCA-C3": 6,
+    }
+    return zone_counts.get(model, 1)
 
 
 def is_rnet_capable(model: str) -> bool:
@@ -95,5 +101,4 @@ def map_rio_to_dict(state: dict, branch: str, leaf: str, value: str) -> None:
                 current[part] = {}
             current = current[part]
 
-    # Set the leaf and value in the final dictionary location
     current[leaf] = value
