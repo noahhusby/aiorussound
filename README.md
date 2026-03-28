@@ -32,6 +32,8 @@ This module implements a Python client for the Russound I/O (RIO) protocol used 
 - Russound XZone70V (untested)
 - Russound XStream-X5 (untested)
 - Russound ACA-E5 (untested)
+- Russound SMZ8
+- Russound SMZ16-PRE
 
 If your model is not on the list of supported devices, and everything works correctly then add it to the list by opening a pull request.
 
