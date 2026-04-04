@@ -21,12 +21,14 @@ class RussoundInt(SerializationStrategy):
     def deserialize(self, value: str) -> int:
         return int(value)
 
+
 class PartyMode(StrEnum):
     """Party mode."""
 
     OFF = "OFF"
     ON = "ON"
     MASTER = "MASTER"
+
 
 @dataclass
 class Zone(DataClassORJSONMixin):
@@ -163,6 +165,7 @@ class PlayStatus(StrEnum):
     STOPPED = "stopped"
     TRANSITIONING = "transitioning"
     LOADING = "loading"
+
 
 @dataclass
 class Source(DataClassORJSONMixin):
