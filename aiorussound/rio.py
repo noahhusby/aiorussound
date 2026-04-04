@@ -33,7 +33,7 @@ from aiorussound.models import (
     CallbackType,
     Source,
     Zone,
-    MessageType,
+    MessageType, PartyMode,
 )
 from aiorussound.util import (
     controller_device_str,
@@ -601,6 +601,10 @@ class ZoneControlSurface(Zone, AbstractControlSurface):
         if preset_id < 1 or preset_id > 36:
             raise RussoundError("Preset ID must be between 1 and 36")
         await self.send_event("RestorePreset", preset_id)
+
+    async def set_party_mode(self, party_mode: PartyMode) -> None:
+        """Set the party mode of the zone."""
+        await self.send_event("PartyMode", party_mode.value)
 
 
 @dataclass
