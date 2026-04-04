@@ -21,6 +21,12 @@ class RussoundInt(SerializationStrategy):
     def deserialize(self, value: str) -> int:
         return int(value)
 
+class PartyMode(StrEnum):
+    """Party mode."""
+
+    OFF = "OFF"
+    ON = "ON"
+    MASTER = "MASTER"
 
 @dataclass
 class Zone(DataClassORJSONMixin):
@@ -54,11 +60,9 @@ class Zone(DataClassORJSONMixin):
         ),
         default=False,
     )
-    party_mode: bool = field(
-        metadata=field_options(
-            alias="partyMode", serialization_strategy=RussoundBool()
-        ),
-        default=False,
+    party_mode: PartyMode = field(
+        metadata=field_options(alias="partyMode"),
+        default=PartyMode.OFF,
     )
     status: bool = field(
         metadata=field_options(serialization_strategy=RussoundBool()), default=False
@@ -159,7 +163,6 @@ class PlayStatus(StrEnum):
     STOPPED = "stopped"
     TRANSITIONING = "transitioning"
     LOADING = "loading"
-
 
 @dataclass
 class Source(DataClassORJSONMixin):
