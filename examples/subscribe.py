@@ -7,14 +7,15 @@ import os
 
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), ".."))
 
-from aiorussound import RussoundTcpConnectionHandler, RussoundClient
-from aiorussound.models import CallbackType
+from aiorussound.rio import RussoundRIOClient
+from aiorussound import RussoundTcpConnectionHandler
+from aiorussound.rio.models import CallbackType
 
 HOST = "192.168.20.17"
 PORT = 4999
 
 
-async def on_state_change(client: RussoundClient, callback_type: CallbackType):
+async def on_state_change(client: RussoundRIOClient, callback_type: CallbackType):
     """Called when new information is received."""
     print(f"Callback Type: {callback_type} {client.is_connected()}")
     print(client.controllers[1].zones[1].status)
@@ -23,7 +24,7 @@ async def on_state_change(client: RussoundClient, callback_type: CallbackType):
 async def main():
     """Subscribe demo entrypoint."""
     conn_handler = RussoundTcpConnectionHandler(HOST, PORT)
-    client = RussoundClient(conn_handler)
+    client = RussoundRIOClient(conn_handler)
 
     await client.register_state_update_callbacks(on_state_change)
     await client.connect()

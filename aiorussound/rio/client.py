@@ -28,12 +28,13 @@ from aiorussound.exceptions import (
     UnsupportedFeatureError,
     RussoundError,
 )
-from aiorussound.models import (
+from aiorussound.rio.models import (
     RussoundMessage,
     CallbackType,
     Source,
     Zone,
-    MessageType, PartyMode,
+    MessageType,
+    PartyMode,
 )
 from aiorussound.util import (
     controller_device_str,
@@ -49,7 +50,7 @@ from aiorussound.util import (
 _LOGGER = logging.getLogger(__package__)
 
 
-class RussoundClient:
+class RussoundRIOClient:
     """Manages the RIO connection to a Russound device."""
 
     def __init__(self, connection_handler: RussoundConnectionHandler) -> None:
@@ -485,7 +486,7 @@ class RussoundClient:
 
 class AbstractControlSurface:
     def __init__(self):
-        self.client: Optional[RussoundClient] = None
+        self.client: Optional[RussoundRIOClient] = None
         self.device_str: Optional[str] = None
 
 
@@ -613,7 +614,7 @@ class Controller:
 
     controller_id: int
     controller_type: str
-    client: RussoundClient
+    client: RussoundRIOClient
     device_str: str
     mac_address: Optional[str]
     firmware_version: Optional[str]
