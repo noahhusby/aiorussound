@@ -105,7 +105,7 @@ class RussoundRIOClient:
         future: Future = Future()
         await self._futures.put(future)
         try:
-            await self.connection_handler.send(cmd)
+            await self.connection_handler.write_str(cmd)
         except Exception as ex:
             _ = await self._futures.get()
             future.set_exception(ex)

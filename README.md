@@ -2,7 +2,7 @@
 
 # aiorussound
 
-#### An async python package for interfacing with Russound RIO hardware
+####  An async python client for Russound RIO and RNET multi-zone audio systems
 
 [**📖 Read the docs »**][docs]
 
@@ -17,7 +17,7 @@
 
 </div>
 
-This module implements a Python client for the Russound I/O (RIO) protocol used to control Russound audio controllers. RIO supports a superset of the RNET feature set, allows for push notifications of system changes and supports TCP/IP and RS232 communication.
+This module implements a Python client for the Russound I/O (RIO) and RNET protocol used to control Russound audio controllers. RIO supports a superset of the RNET feature set, allows for push notifications of system changes and supports TCP/IP and RS232 communication.
 
 ## Supported Devices
 - Russound MBX-PRE
@@ -36,6 +36,35 @@ This module implements a Python client for the Russound I/O (RIO) protocol used 
 - Russound SMZ16-PRE
 
 If your model is not on the list of supported devices, and everything works correctly then add it to the list by opening a pull request.
+
+#### Which protocol should I use?
+
+In most cases, this is already decided for you. Only a handful of devices support both protocols, and **RIO is always recommended over RNET** since it can provide real-time updates without polling.
+
+| Device               | RNET | RIO |
+|---------------------|:----:|:---:|
+| Russound MBX-PRE    |      | ✅  |
+| Russound MBX-AMP    |      | ✅  |
+| Russound MCA-C3     | ⚠️   | ✅  |
+| Russound MCA-C5     | ⚠️   | ✅  |
+| Russound MCA-66     |      | ✅  |
+| Russound MCA-88     |      | ✅  |
+| Russound MCA-88x    |      | ✅  |
+| Russound XSource    |      | ✅  |
+| Russound XZone4     |      | ✅  |
+| Russound XZone70    |      | ✅  |
+| Russound XStream-X5 |      | ✅  |
+| Russound ACA-E5     | ⚠️   | ✅  |
+| Russound SMZ8       |      | ✅  |
+| Russound SMZ16-PRE  |      | ✅  |
+| Russound CAS44      | ✅   |     |
+| Russound CAA66      | ✅   |     |
+| Russound CAM6.6     | ✅   |     |
+| Russound CAV6.6     | ✅   |     |
+
+✅ = **Fully Supported**, ⚠️ = **Supported, RIO protocol preferred**
+
+
 
 ## Communication
 The library supports the RIO protocol communication over TCP/IP or RS232 (Serial). 

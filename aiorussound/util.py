@@ -102,3 +102,19 @@ def map_rio_to_dict(state: dict, branch: str, leaf: str, value: str) -> None:
             current = current[part]
 
     current[leaf] = value
+
+
+def calculate_checksum(data: list[int]) -> int:
+    """Calculate the RNET checksum of a payload."""
+    return (sum(data) + len(data)) & 0x7F
+
+
+def build_packet(payload: list[int]) -> bytes:
+    """Build an RNET packet from a payload."""
+    checksum = calculate_checksum(payload)
+    return bytes([*payload, checksum, 0xF7])
+
+
+def hex_dump(payload: bytes) -> str:
+    """Dump the payload as a hex string."""
+    return " ".join(f"{b:02X}" for b in payload)
