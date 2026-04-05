@@ -6,6 +6,7 @@ from typing import Optional
 
 import serial_asyncio_fast
 
+from aiorussound import RussoundError
 from aiorussound.const import (
     DEFAULT_PORT,
     DEFAULT_BAUDRATE,
@@ -20,13 +21,16 @@ class RussoundConnectionHandler:
         self.reader: Optional[StreamReader] = None
         self.writer: Optional[StreamWriter] = None
 
-    async def send(self, cmd: str) -> None:
-        """Send a command to the Russound client."""
-        self.writer.write(bytearray(f"{cmd}\r", "utf-8"))
-        await self.writer.drain()
+    async def write_str(self, cmd: str) -> None:
+        """Send a string to the Russound client."""
+        await self.write(bytearray(f"{cmd}\r", "utf-8"))
 
-        # if not self.connected:
-        #     raise CommandError("Not connected to device.")
+    async def write(self, data: bytes) -> None:
+        """Send raw bytes to the Russound client."""
+        if self.writer is None:
+            raise RussoundError("Connection handler is not initialized.")
+        self.writer.write(data)
+        await self.writer.drain()
 
     @abstractmethod
     async def connect(self) -> None:
