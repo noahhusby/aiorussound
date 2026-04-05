@@ -1,7 +1,7 @@
 [project]
 name = "aiorussound"
-version = "4.10.0"
-description = "Asyncio client for Russound RIO devices."
+version = "5.0.0
+description = "Async Python client for Russound RIO and RNET multi-zone audio systems."
 authors = [
     { name = "Noah Husby", email = "opensource@husbylabs.com" }
 ]
