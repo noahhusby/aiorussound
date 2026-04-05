@@ -1,3 +1,4 @@
-__all__ = ["RussoundRNETClient"]
+__all__ = ["RussoundRNETClient", "RNETZoneInfo"]
 
 from .client import RussoundRNETClient
+from .models import RNETZoneInfo
