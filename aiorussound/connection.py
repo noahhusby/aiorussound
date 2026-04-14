@@ -4,7 +4,7 @@ from abc import abstractmethod
 from asyncio import StreamReader, StreamWriter
 from typing import Optional
 
-import serial_asyncio_fast
+import serialx
 
 from aiorussound import RussoundError
 from aiorussound.const import (
@@ -64,7 +64,7 @@ class RussoundSerialConnectionHandler(RussoundConnectionHandler):
     async def connect(self) -> None:
         _LOGGER.debug("Connecting to %s (baudrate: %s)", self.port, self.baudrate)
         async with asyncio.timeout(TIMEOUT):
-            self.reader, self.writer = await serial_asyncio_fast.open_serial_connection(
+            self.reader, self.writer = await serialx.open_serial_connection(
                 url=self.port,
                 baudrate=self.baudrate,
             )
