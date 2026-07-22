@@ -574,39 +574,81 @@ class ZoneControlSurface(Zone):
         return await self.send_event("SelectSource", source)
 
     async def set_seek_time(self, time: int) -> None:
-        """Seek to the specified time."""
+        """Seek to a position in the currently playing media.
+
+        Args:
+            time: Playback position in seconds. Must be between zero and the
+                duration of the current track.
+
+        Raises:
+            RussoundError: If `time` is negative or exceeds the current track
+                duration.
+        """
         if time < 0:
             raise RussoundError("Seek time cannot be negative")
-        elif time > self.fetch_current_source().track_time:
+        if time > self.fetch_current_source().track_time:
             raise RussoundError("Seek time cannot be greater than current track time")
         await self.send_event("SetSeekTime", time)
 
     async def set_loudness(self, loudness: bool) -> None:
-        """Set the loudness of the zone."""
+        """Enable or disable loudness compensation for the zone.
+
+        Args:
+            loudness: `True` to enable loudness compensation or `False` to
+                disable it.
+        """
         await self.client.set_variable(
             self.device_str, "loudness", "ON" if loudness else "OFF"
         )
 
     async def set_bass(self, bass: int) -> None:
-        """Set the bass of the zone."""
+        """Set the bass level for the zone.
+
+        Args:
+            bass: Bass level from -10 through 10.
+
+        Raises:
+            RussoundError: If `bass` is outside the supported range.
+        """
         if bass < -10 or bass > 10:
             raise RussoundError("Bass must be between -10 and 10")
         await self.client.set_variable(self.device_str, "bass", str(bass))
 
     async def set_treble(self, treble: int) -> None:
-        """Set the treble of the zone."""
+        """Set the treble level for the zone.
+
+        Args:
+            treble: Treble level from -10 through 10.
+
+        Raises:
+            RussoundError: If `treble` is outside the supported range.
+        """
         if treble < -10 or treble > 10:
             raise RussoundError("Treble must be between -10 and 10")
         await self.client.set_variable(self.device_str, "treble", str(treble))
 
     async def set_balance(self, balance: int) -> None:
-        """Set the treble of the zone."""
+        """Set the left-right audio balance for the zone.
+
+        Args:
+            balance: Balance level from -10 through 10.
+
+        Raises:
+            RussoundError: If `balance` is outside the supported range.
+        """
         if balance < -10 or balance > 10:
             raise RussoundError("Balance must be between -10 and 10")
         await self.client.set_variable(self.device_str, "balance", str(balance))
 
     async def set_turn_on_volume(self, turn_on_volume: int) -> None:
-        """Set the turn on volume of the zone."""
+        """Set the volume used when the zone is turned on.
+
+        Args:
+            turn_on_volume: Turn-on volume from 0 through 50.
+
+        Raises:
+            RussoundError: If `turn_on_volume` is outside the supported range.
+        """
         if turn_on_volume < 0 or turn_on_volume > 50:
             raise RussoundError("Turn on volume must be between 0 and 50")
         await self.client.set_variable(
@@ -614,13 +656,24 @@ class ZoneControlSurface(Zone):
         )
 
     async def restore_preset(self, preset_id: int) -> None:
-        """Restore the preset of the zone."""
+        """Restore a preset in the zone.
+
+        Args:
+            preset_id: Preset identifier from 1 through 36.
+
+        Raises:
+            RussoundError: If `preset_id` is outside the supported range.
+        """
         if preset_id < 1 or preset_id > 36:
             raise RussoundError("Preset ID must be between 1 and 36")
         await self.send_event("RestorePreset", preset_id)
 
     async def set_party_mode(self, party_mode: PartyMode) -> None:
-        """Set the party mode of the zone."""
+        """Set the party mode for the zone.
+
+        Args:
+            party_mode: Party mode to apply to the zone.
+        """
         await self.send_event("PartyMode", party_mode.value)
 
 
