@@ -8,6 +8,8 @@ from asyncio import Future, Task, AbstractEventLoop, Queue
 from dataclasses import field, dataclass
 from typing import Any, Coroutine, Optional
 
+from mashumaro import field_options
+
 from aiorussound.connection import RussoundConnectionHandler
 from aiorussound.const import (
     FLAGS_BY_VERSION,
@@ -361,10 +363,13 @@ class RussoundRIOClient:
         """Handle async info update."""
         for controller_id, controller_data in self.state["C"].items():
             for zone_id, zone_data in controller_data["Z"].items():
-                zone = ZoneControlSurface.from_dict(zone_data)
-                zone.client = self
-                zone.device_str = zone_device_str(controller_id, zone_id)
-                self.controllers[controller_id].zones[zone_id] = zone
+                self.controllers[controller_id].zones[zone_id] = (
+                    ZoneControlSurface.from_state(
+                        zone_data,
+                        client=self,
+                        device_str=zone_device_str(controller_id, zone_id),
+                    )
+                )
         if self._do_state_update:
             await self.do_state_update_callbacks()
 
@@ -484,13 +489,24 @@ class RussoundRIOClient:
         return flags
 
 
-class AbstractControlSurface:
-    def __init__(self):
-        self.client: Optional[RussoundRIOClient] = None
-        self.device_str: Optional[str] = None
+class ZoneControlSurface(Zone):
+    """Russound zone with runtime control capabilities."""
 
+    client: RussoundRIOClient = field(
+        init=False, repr=False, compare=False, metadata=field_options(serialize="omit")
+    )
+    device_str: str = field(init=False, metadata=field_options(serialize="omit"))
 
-class ZoneControlSurface(Zone, AbstractControlSurface):
+    @classmethod
+    def from_state(
+        cls, data: dict[str, Any], *, client: RussoundRIOClient, device_str: str
+    ) -> ZoneControlSurface:
+        """Creates a zone from RIO state and attach runtime context."""
+        zone = cls.from_dict(data)
+        zone.client = client
+        zone.device_str = device_str
+        return zone
+
     async def send_event(self, event_name, *args) -> str:
         """Send an event to a zone."""
         args = " ".join(str(x) for x in args)
