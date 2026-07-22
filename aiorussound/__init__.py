@@ -18,4 +18,6 @@ __all__ = [
     "UnsupportedRussoundVersionError",
     "UncachedVariableError",
     "RussoundTcpConnectionHandler",
+    "rio",
+    "rnet",
 ]
