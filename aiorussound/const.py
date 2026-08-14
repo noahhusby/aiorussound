@@ -30,6 +30,7 @@ PRESET_COMPATIBLE_SOURCES = [
     "RNET XM Tuner (External)",
     "RNET Sirius Tuner (External)",
     "DMS-3.1 AM/FM Tuner",
+    "ST1 AM/FM Tuner",
 ]
 TOTAL_BANKS = 6
 TOTAL_PRESETS_PER_BANK = 6
