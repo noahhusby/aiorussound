@@ -1,4 +1,11 @@
-from .models import Source, RussoundMessage, Zone
+from .media_management import MediaManagementSession
+from .models import (
+    MediaManagementMenuItem,
+    MediaManagementMenuPage,
+    RussoundMessage,
+    Source,
+    Zone,
+)
 from .client import Controller, RussoundRIOClient
 
 __all__ = [
@@ -7,4 +14,7 @@ __all__ = [
     "Zone",
     "Source",
     "RussoundMessage",
+    "MediaManagementMenuItem",
+    "MediaManagementMenuPage",
+    "MediaManagementSession",
 ]

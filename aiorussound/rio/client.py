@@ -17,7 +17,6 @@ from aiorussound.const import (
     MINIMUM_API_SUPPORT,
     FeatureFlag,
     MAX_RNET_CONTROLLERS,
-    RESPONSE_REGEX,
     KEEP_ALIVE_INTERVAL,
     TIMEOUT,
     CONTROLLER_TYPE_FIX_MAP,
@@ -38,6 +37,8 @@ from aiorussound.rio.models import (
     MessageType,
     PartyMode,
 )
+from aiorussound.rio.media_management import MediaManagementSession
+from aiorussound.rio.protocol import process_response as parse_response
 from aiorussound.util import (
     controller_device_str,
     is_feature_supported,
@@ -276,31 +277,17 @@ class RussoundRIOClient:
     @staticmethod
     def process_response(res: bytes) -> Optional[RussoundMessage]:
         """Process an incoming string of bytes into a RussoundMessage"""
-        try:
-            # Attempt to decode in Latin and re-encode in UTF-8 to support international characters
-            str_res = (
-                res.decode(encoding="iso-8859-1")
-                .encode(encoding="utf-8")
-                .decode(encoding="utf-8")
-                .strip()
-            )
-        except UnicodeDecodeError as e:
-            _LOGGER.warning("Failed to decode Russound response %s", res, e)
-            return None
-        if not str_res:
-            return None
-        if len(str_res) == 1 and str_res[0] == "S":
-            return RussoundMessage(MessageType.STATE, None, None, None)
-        tag, payload = str_res[0], str_res[2:]
-        if tag == "E":
-            _LOGGER.debug("Device responded with error: %s", payload)
-            return RussoundMessage(tag, None, None, payload)
-        m = RESPONSE_REGEX.match(payload.strip())
-        if not m:
-            return RussoundMessage(tag, None, None, None)
-        value = m.group(3)
-        value = None if not value or value == "------" else value
-        return RussoundMessage(tag, m.group(1) or None, m.group(2), value)
+        return parse_response(res)
+
+    def create_media_management_session(
+        self, zone_device_str: str, *, page_size: int = 100
+    ) -> MediaManagementSession:
+        """Create a dedicated controller-routed Media Management session."""
+        return MediaManagementSession(
+            self.connection_handler.create_media_management_connection(),
+            zone_device_str,
+            page_size=page_size,
+        )
 
     async def consumer_handler(self, handler: RussoundConnectionHandler):
         """Callback consumer handler."""
@@ -512,6 +499,14 @@ class ZoneControlSurface(Zone):
         args = " ".join(str(x) for x in args)
         cmd = f"EVENT {self.device_str}!{event_name} {args}"
         return await self.client.request(cmd)
+
+    def create_media_management_session(
+        self, *, page_size: int = 100
+    ) -> MediaManagementSession:
+        """Create a dedicated Media Management session for this zone."""
+        return self.client.create_media_management_session(
+            self.device_str, page_size=page_size
+        )
 
     def fetch_current_source(self) -> Source:
         """Return the current source as a source object."""

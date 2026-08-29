@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Optional, Dict
+from typing import Any, Dict, Optional, Self
+
+import orjson
 
 from mashumaro import field_options
 from mashumaro.mixins.orjson import DataClassORJSONMixin
@@ -262,6 +264,126 @@ class MessageType(StrEnum):
     ERROR = "E"
 
 
+@dataclass(frozen=True)
+class MediaManagementMenuItem:
+    """A menu item returned by a Russound Media Management session."""
+
+    item_id: int
+    text: str
+    is_first: bool | None = None
+    is_last: bool | None = None
+    is_menu: bool | None = None
+    beginning_of_transmission: bool | None = None
+    end_of_transmission: bool | None = None
+    value: str | None = None
+    image_url: str | None = None
+    uri: str | None = None
+    attributes: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        """Create a menu item from a protocol JSON object."""
+        return cls(
+            item_id=_required_int(data, "id"),
+            text=_required_str(data, "text"),
+            is_first=_optional_bool(data, "isFirst"),
+            is_last=_optional_bool(data, "isLast"),
+            is_menu=_optional_bool(data, "isMenu"),
+            beginning_of_transmission=_optional_bool(data, "BOT"),
+            end_of_transmission=_optional_bool(data, "EOT"),
+            value=_optional_str(data, "value"),
+            image_url=_optional_str(data, "imgURL"),
+            uri=_optional_str(data, "uri"),
+            attributes=_optional_str(data, "attributes"),
+        )
+
+
+@dataclass(frozen=True)
+class MediaManagementMenuPage:
+    """A JSON-formatted page of Media Management menu items."""
+
+    total_items: int
+    num_items: int
+    menu_items: tuple[MediaManagementMenuItem, ...]
+
+    @classmethod
+    def from_json(cls, payload: str | bytes) -> Self:
+        """Create a menu page from a RIO JSON notification."""
+        try:
+            data = orjson.loads(payload)
+        except (orjson.JSONDecodeError, TypeError) as err:
+            raise ValueError("Invalid Media Management JSON response") from err
+        if not isinstance(data, dict):
+            raise TypeError("Media Management JSON response must be an object")
+        return cls.from_dict(data)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        """Create a menu page from a decoded RIO JSON notification."""
+        menu_items_data = data.get("menuItems")
+        if not isinstance(menu_items_data, list):
+            raise TypeError("Media Management response is missing menuItems")
+
+        menu_items = tuple(
+            MediaManagementMenuItem.from_dict(item)
+            for item in menu_items_data
+            if isinstance(item, dict)
+        )
+        if len(menu_items) != len(menu_items_data):
+            raise ValueError("Media Management menuItems must contain only objects")
+
+        num_items = _required_non_negative_int(data, "numItems")
+        if num_items != len(menu_items):
+            raise ValueError(
+                "Media Management numItems does not match the returned menuItems"
+            )
+
+        return cls(
+            total_items=_required_non_negative_int(data, "totalItems"),
+            num_items=num_items,
+            menu_items=menu_items,
+        )
+
+
+def _required_int(data: dict[str, Any], key: str) -> int:
+    value = data.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"Media Management {key} must be an integer")
+    return value
+
+
+def _required_non_negative_int(data: dict[str, Any], key: str) -> int:
+    value = _required_int(data, key)
+    if value < 0:
+        raise ValueError(f"Media Management {key} must not be negative")
+    return value
+
+
+def _required_str(data: dict[str, Any], key: str) -> str:
+    value = data.get(key)
+    if not isinstance(value, str):
+        raise TypeError(f"Media Management {key} must be a string")
+    return value
+
+
+def _optional_str(data: dict[str, Any], key: str) -> str | None:
+    value = data.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise TypeError(f"Media Management {key} must be a string")
+    return value
+
+
+def _optional_bool(data: dict[str, Any], key: str) -> bool | None:
+    value = data.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, bool):
+        raise TypeError(f"Media Management {key} must be a boolean")
+    return value
+
+
 @dataclass
 class RussoundMessage:
     """Incoming russound message."""
@@ -270,3 +392,4 @@ class RussoundMessage:
     branch: Optional[str] = None
     leaf: Optional[str] = None
     value: Optional[str] = None
+    media_management_page: MediaManagementMenuPage | None = None
