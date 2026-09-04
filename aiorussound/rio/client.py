@@ -543,23 +543,23 @@ class ZoneControlSurface(Zone):
 
     async def previous(self) -> str:
         """Go to the previous song."""
-        return await self.send_event("KeyPress", "Previous")
+        return await self.send_event("KeyRelease", "Previous")
 
     async def next(self) -> str:
         """Go to the next song."""
-        return await self.send_event("KeyPress", "Next")
+        return await self.send_event("KeyRelease", "Next")
 
     async def stop(self) -> str:
         """Stop the current song."""
-        return await self.send_event("KeyPress", "Stop")
+        return await self.send_event("KeyRelease", "Stop")
 
     async def pause(self) -> str:
         """Pause the current song."""
-        return await self.send_event("KeyPress", "Pause")
+        return await self.send_event("KeyRelease", "Pause")
 
     async def play(self) -> str:
         """Play the queued song."""
-        return await self.send_event("KeyPress", "Play")
+        return await self.send_event("KeyRelease", "Play")
 
     async def zone_on(self) -> str:
         """Turn on the zone."""
