@@ -6,7 +6,7 @@ from typing import Optional
 
 import serialx
 
-from aiorussound import RussoundError, UnsupportedFeatureError
+from aiorussound import RussoundError
 from aiorussound.const import (
     DEFAULT_PORT,
     DEFAULT_BAUDRATE,
@@ -32,23 +32,6 @@ class RussoundConnectionHandler:
         self.writer.write(data)
         await self.writer.drain()
 
-    async def close(self) -> None:
-        """Close the underlying connection."""
-        if self.writer is not None:
-            self.writer.close()
-            try:
-                await self.writer.wait_closed()
-            except (AttributeError, ConnectionError, OSError):
-                pass
-        self.reader = None
-        self.writer = None
-
-    def create_media_management_connection(self) -> "RussoundConnectionHandler":
-        """Create a dedicated connection for a Media Management session."""
-        raise UnsupportedFeatureError(
-            "Media Management sessions require a dedicated TCP/IP connection."
-        )
-
     @abstractmethod
     async def connect(self) -> None:
         raise NotImplementedError
@@ -69,11 +52,6 @@ class RussoundTcpConnectionHandler(RussoundConnectionHandler):
             reader, writer = await asyncio.open_connection(self.host, self.port)
         self.reader = reader
         self.writer = writer
-
-    def create_media_management_connection(self) -> "RussoundTcpConnectionHandler":
-        """Create a dedicated TCP/IP connection for Media Management."""
-        return RussoundTcpConnectionHandler(self.host, self.port)
-
 
 class RussoundSerialConnectionHandler(RussoundConnectionHandler):
     def __init__(self, port: str, baudrate: int = DEFAULT_BAUDRATE) -> None:

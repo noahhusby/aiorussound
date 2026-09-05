@@ -30,6 +30,7 @@ from aiorussound.exceptions import (
     RussoundError,
 )
 from aiorussound.rio.models import (
+    MediaManagementMenuPage,
     RussoundMessage,
     CallbackType,
     Source,
@@ -72,6 +73,7 @@ class RussoundRIOClient:
         self.rio_version: str | None = None
         self.state = {}
         self._futures: Queue = Queue()
+        self._media_management_session: MediaManagementSession | None = None
         self._attempt_reconnection = False
         self._do_state_update = False
 
@@ -282,12 +284,23 @@ class RussoundRIOClient:
     def create_media_management_session(
         self, zone_device_str: str, *, page_size: int = 100
     ) -> MediaManagementSession:
-        """Create a dedicated controller-routed Media Management session."""
-        return MediaManagementSession(
-            self.connection_handler.create_media_management_connection(),
-            zone_device_str,
-            page_size=page_size,
-        )
+        """Create a controller-routed Media Management session."""
+        return MediaManagementSession(self, zone_device_str, page_size=page_size)
+
+    def _register_media_management_session(
+        self, session: MediaManagementSession
+    ) -> None:
+        """Register the active Media Management session for this connection."""
+        if self._media_management_session is not None:
+            raise RussoundError("A Media Management session is already active")
+        self._media_management_session = session
+
+    def _unregister_media_management_session(
+        self, session: MediaManagementSession
+    ) -> None:
+        """Clear the active Media Management session."""
+        if self._media_management_session is session:
+            self._media_management_session = None
 
     async def consumer_handler(self, handler: RussoundConnectionHandler):
         """Callback consumer handler."""
@@ -304,6 +317,22 @@ class RussoundRIOClient:
                         future: Future = await self._futures.get()
                         if not future.done():
                             future.set_exception(CommandError)
+                    elif (
+                        msg.type == "E"
+                        and self._media_management_session is not None
+                    ):
+                        self._media_management_session._handle_error(
+                            CommandError(
+                                msg.value or "Media Management command failed"
+                            )
+                        )
+                    if (
+                        msg.media_management_page is not None
+                        and self._media_management_session is not None
+                    ):
+                        self._media_management_session._handle_page(
+                            msg.media_management_page
+                        )
                     if msg.branch and msg.leaf and msg.type == "N":
                         map_rio_to_dict(self.state, msg.branch, msg.leaf, msg.value)
                         subscription = self._subscriptions.get(msg.branch)
@@ -503,7 +532,7 @@ class ZoneControlSurface(Zone):
     def create_media_management_session(
         self, *, page_size: int = 100
     ) -> MediaManagementSession:
-        """Create a dedicated Media Management session for this zone."""
+        """Create a Media Management session for this zone."""
         return self.client.create_media_management_session(
             self.device_str, page_size=page_size
         )

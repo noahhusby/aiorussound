@@ -6,35 +6,50 @@ import asyncio
 import logging
 import re
 from asyncio import Future, Task
-from typing import Self
+from typing import Protocol, Self
 
-from aiorussound.connection import RussoundConnectionHandler
 from aiorussound.const import TIMEOUT
 from aiorussound.exceptions import CommandError, RussoundError
-from aiorussound.rio.models import (
-    MediaManagementMenuPage,
-    MessageType,
-    RussoundMessage,
-)
-from aiorussound.rio.protocol import process_response
+from aiorussound.rio.models import MediaManagementMenuPage
 
 DEFAULT_MEDIA_MANAGEMENT_PAGE_SIZE = 100
 DEFAULT_MEDIA_MANAGEMENT_KEEP_ALIVE_INTERVAL = 45.0
 
-_CONTROLLER_ZONE_RE = re.compile(r"^C\[\d+]\.Z\[\d+]$")
+_CONTROLLER_ZONE_RE = re.compile(r"^C\[\d+\]\.Z\[\d+\]$")
 _LOGGER = logging.getLogger(__package__)
 
 
-class MediaManagementSession:
-    """A dedicated controller-routed Russound Media Management session.
+class MediaManagementClient(Protocol):
+    """RIO client surface used by a Media Management session."""
 
-    Media Management state is scoped to an IP socket. This class owns a dedicated
-    connection rather than sharing the RIO client's state and subscription socket.
+    async def connect(self) -> None:
+        """Connect to the RIO controller."""
+
+    async def request(self, cmd: str) -> str:
+        """Send a RIO command and wait for its response."""
+
+    def _register_media_management_session(
+        self, session: MediaManagementSession
+    ) -> None:
+        """Register an active Media Management session."""
+
+    def _unregister_media_management_session(
+        self, session: MediaManagementSession
+    ) -> None:
+        """Unregister an active Media Management session."""
+
+
+class MediaManagementSession:
+    """A controller-routed Media Management session on a RIO connection.
+
+    The RIO protocol permits one Media Management session per connection. A
+    session therefore shares the client's established TCP or serial connection
+    and receives JSON page notifications through the client's consumer.
     """
 
     def __init__(
         self,
-        connection_handler: RussoundConnectionHandler,
+        client: MediaManagementClient,
         zone_device_str: str,
         *,
         page_size: int = DEFAULT_MEDIA_MANAGEMENT_PAGE_SIZE,
@@ -50,38 +65,36 @@ class MediaManagementSession:
         if keep_alive_interval <= 0:
             raise ValueError("Media Management keep-alive interval must be positive")
 
-        self._connection_handler = connection_handler
+        self._client = client
         self._zone_device_str = zone_device_str
         self._page_size = page_size
         self._keep_alive_interval = keep_alive_interval
         self._command_lock = asyncio.Lock()
-        self._consumer_task: Task[None] | None = None
         self._keep_alive_task: Task[None] | None = None
-        self._response_future: Future[RussoundMessage] | None = None
         self._page_future: Future[MediaManagementMenuPage] | None = None
+        self._is_connected = False
 
     async def __aenter__(self) -> Self:
-        """Connect to the dedicated Media Management socket."""
+        """Connect the client and register the Media Management session."""
         await self.connect()
         return self
 
     async def __aexit__(self, *_: object) -> None:
-        """Close the dedicated Media Management socket."""
+        """Close the Media Management session."""
         await self.close()
 
     @property
     def is_connected(self) -> bool:
-        """Return whether the session consumer is active."""
-        return self._consumer_task is not None and not self._consumer_task.done()
+        """Return whether this session is registered with its client."""
+        return self._is_connected
 
     async def connect(self) -> None:
-        """Connect and begin consuming RIO responses."""
+        """Connect the RIO client and register this session."""
         if self.is_connected:
             return
-        await self._connection_handler.connect()
-        if self._connection_handler.reader is None:
-            raise RussoundError("Media Management connection did not provide a reader")
-        self._consumer_task = asyncio.create_task(self._consume())
+        await self._client.connect()
+        self._client._register_media_management_session(self)
+        self._is_connected = True
 
     async def initialize(self) -> MediaManagementMenuPage:
         """Configure a JSON session and return the top-level Media Management page."""
@@ -103,25 +116,25 @@ class MediaManagementSession:
         return page
 
     async def close(self) -> None:
-        """Close the Media Management session and its dedicated connection."""
+        """Close the Media Management session without closing the client connection."""
         if self.is_connected:
             try:
                 await self._send_event("MMClose")
             except (CommandError, RussoundError, TimeoutError):
                 _LOGGER.debug("Unable to close Media Management session cleanly")
 
-        for task in (self._keep_alive_task, self._consumer_task):
-            if task is not None and not task.done():
-                task.cancel()
-        for task in (self._keep_alive_task, self._consumer_task):
-            if task is not None:
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+        if self._keep_alive_task is not None and not self._keep_alive_task.done():
+            self._keep_alive_task.cancel()
+        if self._keep_alive_task is not None:
+            try:
+                await self._keep_alive_task
+            except asyncio.CancelledError:
+                pass
 
         self._fail_pending(RussoundError("Media Management session closed"))
-        await self._connection_handler.close()
+        if self.is_connected:
+            self._client._unregister_media_management_session(self)
+            self._is_connected = False
 
     async def _send_event(
         self, event_name: str, *args: str, expect_page: bool = False
@@ -139,71 +152,34 @@ class MediaManagementSession:
         if not self.is_connected:
             raise RussoundError("Media Management session is not connected")
 
-        loop = asyncio.get_running_loop()
-        response_future: Future[RussoundMessage] = loop.create_future()
         page_future: Future[MediaManagementMenuPage] | None = None
         if expect_page:
-            page_future = loop.create_future()
-        self._response_future = response_future
+            page_future = asyncio.get_running_loop().create_future()
         self._page_future = page_future
 
         command = _event_command(self._zone_device_str, event_name, *args)
         try:
-            await self._connection_handler.write_str(command)
-            await asyncio.wait_for(response_future, timeout=TIMEOUT)
+            await asyncio.wait_for(self._client.request(command), timeout=TIMEOUT)
             if page_future is not None:
                 return await asyncio.wait_for(page_future, timeout=TIMEOUT)
             return None
         finally:
-            if self._response_future is response_future:
-                self._response_future = None
             if self._page_future is page_future:
                 self._page_future = None
 
-    async def _consume(self) -> None:
-        """Consume responses from the dedicated Media Management connection."""
-        reader = self._connection_handler.reader
-        if reader is None:
-            return
-        try:
-            async for raw_message in reader:
-                message = process_response(raw_message)
-                if message is None:
-                    continue
-                if message.type == MessageType.STATE:
-                    self._set_response(message)
-                elif message.type == MessageType.ERROR:
-                    self._set_error(message)
-                if message.media_management_page is not None:
-                    self._set_page(message.media_management_page)
-        except (asyncio.CancelledError, OSError):
-            pass
-        finally:
-            self._fail_pending(RussoundError("Media Management connection closed"))
-
-    def _set_response(self, message: RussoundMessage) -> None:
-        """Resolve the command response currently in flight."""
-        if self._response_future is not None and not self._response_future.done():
-            self._response_future.set_result(message)
-
-    def _set_error(self, message: RussoundMessage) -> None:
-        """Fail the command response currently in flight."""
-        error = CommandError(message.value or "Media Management command failed")
-        if self._response_future is not None and not self._response_future.done():
-            self._response_future.set_exception(error)
-        elif self._page_future is not None and not self._page_future.done():
-            self._page_future.set_exception(error)
-
-    def _set_page(self, page: MediaManagementMenuPage) -> None:
-        """Resolve the page expected by the current navigation operation."""
+    def _handle_page(self, page: MediaManagementMenuPage) -> None:
+        """Deliver a Media Management page from the shared client consumer."""
         if self._page_future is not None and not self._page_future.done():
             self._page_future.set_result(page)
 
+    def _handle_error(self, error: CommandError) -> None:
+        """Fail a pending page request from the shared client consumer."""
+        if self._page_future is not None and not self._page_future.done():
+            self._page_future.set_exception(error)
+
     def _fail_pending(self, error: RussoundError) -> None:
-        """Fail outstanding waiters when the socket stops."""
-        if self._response_future is not None and not self._response_future.done():
-            self._response_future.set_exception(error)
-        elif self._page_future is not None and not self._page_future.done():
+        """Fail outstanding waiters when the session closes."""
+        if self._page_future is not None and not self._page_future.done():
             self._page_future.set_exception(error)
 
     async def _keep_alive(self) -> None:
