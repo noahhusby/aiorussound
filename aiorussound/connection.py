@@ -53,7 +53,6 @@ class RussoundTcpConnectionHandler(RussoundConnectionHandler):
         self.reader = reader
         self.writer = writer
 
-
 class RussoundSerialConnectionHandler(RussoundConnectionHandler):
     def __init__(self, port: str, baudrate: int = DEFAULT_BAUDRATE) -> None:
         """Initialize the Russound object using the event loop, port and baudrate provided."""
