@@ -16,7 +16,6 @@ from aiorussound.exceptions import CommandError, RussoundError
 from aiorussound.rio.client import RussoundRIOClient
 from aiorussound.rio.media_management import MediaManagementSession
 from aiorussound.rio.models import MediaManagementMenuPage
-from aiorussound.rio.protocol import process_response
 
 MENU_PAGE = json.dumps(
     {
@@ -105,7 +104,7 @@ class FakeReaderConnection(RussoundConnectionHandler):
 
 def test_processes_json_media_management_notification() -> None:
     """A JSON notification is converted to a typed menu page."""
-    message = process_response(f"N {MENU_PAGE}\r\n".encode())
+    message = RussoundRIOClient.process_response(f"N {MENU_PAGE}\r\n".encode())
 
     assert message is not None
     assert message.media_management_page is not None
@@ -120,7 +119,7 @@ def test_processes_json_media_management_notification() -> None:
 
 def test_ignores_malformed_media_management_notification() -> None:
     """A malformed page does not interrupt the protocol consumer."""
-    message = process_response(
+    message = RussoundRIOClient.process_response(
         b'N {"totalItems":1,"numItems":1,"menuItems":["not-an-object"]}\r\n'
     )
 
@@ -140,9 +139,9 @@ async def test_initializes_controller_json_session() -> None:
     assert client.connected is True
     assert client.commands == [
         "EVENT C[1].Z[2]!MMVerbosity 2",
-        'EVENT C[1].Z[2]!MMIndex "ABSOLUTE"',
+        "EVENT C[1].Z[2]!MMIndex ABSOLUTE",
         "EVENT C[1].Z[2]!MMMaxItems 25",
-        'EVENT C[1].Z[2]!MMFormat "JSON"',
+        "EVENT C[1].Z[2]!MMFormat JSON",
         "EVENT C[1].Z[2]!MMInit",
     ]
 
@@ -156,7 +155,7 @@ async def test_initializes_controller_json_session() -> None:
 @pytest.mark.asyncio
 async def test_propagates_media_management_command_error() -> None:
     """A command error fails the initializing call rather than timing out."""
-    client = FakeMediaManagementClient(fail_command='MMFormat "JSON"')
+    client = FakeMediaManagementClient(fail_command="MMFormat JSON")
     session = MediaManagementSession(client, "C[1].Z[2]")
 
     with pytest.raises(CommandError, match="unsupported command"):
