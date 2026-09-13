@@ -17,7 +17,6 @@ from aiorussound.const import (
     MINIMUM_API_SUPPORT,
     FeatureFlag,
     MAX_RNET_CONTROLLERS,
-    RESPONSE_REGEX,
     KEEP_ALIVE_INTERVAL,
     TIMEOUT,
     CONTROLLER_TYPE_FIX_MAP,
@@ -31,6 +30,7 @@ from aiorussound.exceptions import (
     RussoundError,
 )
 from aiorussound.rio.models import (
+    MediaManagementMenuPage,
     RussoundMessage,
     CallbackType,
     Source,
@@ -38,6 +38,7 @@ from aiorussound.rio.models import (
     MessageType,
     PartyMode,
 )
+from aiorussound.rio.media_management import MediaManagementSession
 from aiorussound.util import (
     controller_device_str,
     is_feature_supported,
@@ -71,6 +72,7 @@ class RussoundRIOClient:
         self.rio_version: str | None = None
         self.state = {}
         self._futures: Queue = Queue()
+        self._media_management_session: MediaManagementSession | None = None
         self._attempt_reconnection = False
         self._do_state_update = False
 
@@ -275,32 +277,72 @@ class RussoundRIOClient:
 
     @staticmethod
     def process_response(res: bytes) -> Optional[RussoundMessage]:
-        """Process an incoming string of bytes into a RussoundMessage"""
+        """Process an incoming RIO response into a structured message."""
         try:
-            # Attempt to decode in Latin and re-encode in UTF-8 to support international characters
             str_res = (
                 res.decode(encoding="iso-8859-1")
                 .encode(encoding="utf-8")
                 .decode(encoding="utf-8")
                 .strip()
             )
-        except UnicodeDecodeError as e:
-            _LOGGER.warning("Failed to decode Russound response %s", res, e)
+        except UnicodeDecodeError as err:
+            _LOGGER.warning("Failed to decode Russound response %s: %s", res, err)
             return None
+
         if not str_res:
             return None
-        if len(str_res) == 1 and str_res[0] == "S":
-            return RussoundMessage(MessageType.STATE, None, None, None)
-        tag, payload = str_res[0], str_res[2:]
-        if tag == "E":
+        if str_res.startswith("{"):
+            return RussoundRIOClient._media_management_message(
+                MessageType.NOTIFICATION, str_res
+            )
+
+        tag = str_res[0].upper()
+        payload = str_res[1:].lstrip()
+        if tag == MessageType.ERROR:
             _LOGGER.debug("Device responded with error: %s", payload)
-            return RussoundMessage(tag, None, None, payload)
-        m = RESPONSE_REGEX.match(payload.strip())
-        if not m:
-            return RussoundMessage(tag, None, None, None)
-        value = m.group(3)
+            return RussoundMessage(tag, value=payload)
+        if payload.startswith("{"):
+            return RussoundRIOClient._media_management_message(tag, payload)
+        if tag == MessageType.STATE and not payload:
+            return RussoundMessage(MessageType.STATE)
+
+        match = RESPONSE_REGEX.match(payload)
+        if not match:
+            return RussoundMessage(tag)
+        value = match.group(3)
         value = None if not value or value == "------" else value
-        return RussoundMessage(tag, m.group(1) or None, m.group(2), value)
+        return RussoundMessage(tag, match.group(1) or None, match.group(2), value)
+
+    @staticmethod
+    def _media_management_message(tag: str, payload: str) -> RussoundMessage:
+        """Create a message containing a parsed Media Management page."""
+        try:
+            page = MediaManagementMenuPage.from_json(payload)
+        except (TypeError, ValueError):
+            _LOGGER.warning("Failed to parse Media Management JSON notification")
+            return RussoundMessage(tag)
+        return RussoundMessage(tag, media_management_page=page)
+
+    def create_media_management_session(
+        self, zone_device_str: str, *, page_size: int = 100
+    ) -> MediaManagementSession:
+        """Create a controller-routed Media Management session."""
+        return MediaManagementSession(self, zone_device_str, page_size=page_size)
+
+    def _register_media_management_session(
+        self, session: MediaManagementSession
+    ) -> None:
+        """Register the active Media Management session for this connection."""
+        if self._media_management_session is not None:
+            raise RussoundError("A Media Management session is already active")
+        self._media_management_session = session
+
+    def _unregister_media_management_session(
+        self, session: MediaManagementSession
+    ) -> None:
+        """Clear the active Media Management session."""
+        if self._media_management_session is session:
+            self._media_management_session = None
 
     async def consumer_handler(self, handler: RussoundConnectionHandler):
         """Callback consumer handler."""
@@ -317,6 +359,22 @@ class RussoundRIOClient:
                         future: Future = await self._futures.get()
                         if not future.done():
                             future.set_exception(CommandError)
+                    elif (
+                        msg.type == "E"
+                        and self._media_management_session is not None
+                    ):
+                        self._media_management_session._handle_error(
+                            CommandError(
+                                msg.value or "Media Management command failed"
+                            )
+                        )
+                    if (
+                        msg.media_management_page is not None
+                        and self._media_management_session is not None
+                    ):
+                        self._media_management_session._handle_page(
+                            msg.media_management_page
+                        )
                     if msg.branch and msg.leaf and msg.type == "N":
                         map_rio_to_dict(self.state, msg.branch, msg.leaf, msg.value)
                         subscription = self._subscriptions.get(msg.branch)
@@ -512,6 +570,14 @@ class ZoneControlSurface(Zone):
         args = " ".join(str(x) for x in args)
         cmd = f"EVENT {self.device_str}!{event_name} {args}"
         return await self.client.request(cmd)
+
+    def create_media_management_session(
+        self, *, page_size: int = 100
+    ) -> MediaManagementSession:
+        """Create a Media Management session for this zone."""
+        return self.client.create_media_management_session(
+            self.device_str, page_size=page_size
+        )
 
     def fetch_current_source(self) -> Source:
         """Return the current source as a source object."""
