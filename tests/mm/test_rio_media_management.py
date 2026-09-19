@@ -14,8 +14,7 @@ from aiorussound.connection import (
 )
 from aiorussound.exceptions import CommandError, RussoundError
 from aiorussound.rio.client import RussoundRIOClient
-from aiorussound.rio.media_management import MediaManagementSession
-from aiorussound.rio.models import MediaManagementMenuPage
+from aiorussound.rio.mm import MediaManagementMenuPage, MediaManagementSession
 
 MENU_PAGE = json.dumps(
     {

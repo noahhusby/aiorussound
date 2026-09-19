@@ -10,7 +10,7 @@ from typing import Protocol, Self
 
 from aiorussound.const import TIMEOUT
 from aiorussound.exceptions import CommandError, RussoundError
-from aiorussound.rio.models import MediaManagementMenuPage
+from .models import MediaManagementMenuPage
 
 DEFAULT_MEDIA_MANAGEMENT_PAGE_SIZE = 100
 DEFAULT_MEDIA_MANAGEMENT_KEEP_ALIVE_INTERVAL = 45.0

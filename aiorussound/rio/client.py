@@ -23,6 +23,7 @@ from aiorussound.const import (
     PRESET_COMPATIBLE_SOURCES,
     TOTAL_BANKS,
     TOTAL_PRESETS_PER_BANK,
+    RESPONSE_REGEX,
 )
 from aiorussound.exceptions import (
     CommandError,
@@ -30,7 +31,6 @@ from aiorussound.exceptions import (
     RussoundError,
 )
 from aiorussound.rio.models import (
-    MediaManagementMenuPage,
     RussoundMessage,
     CallbackType,
     Source,
@@ -38,7 +38,7 @@ from aiorussound.rio.models import (
     MessageType,
     PartyMode,
 )
-from aiorussound.rio.media_management import MediaManagementSession
+from aiorussound.rio.mm import MediaManagementMenuPage, MediaManagementSession
 from aiorussound.util import (
     controller_device_str,
     is_feature_supported,
@@ -359,14 +359,9 @@ class RussoundRIOClient:
                         future: Future = await self._futures.get()
                         if not future.done():
                             future.set_exception(CommandError)
-                    elif (
-                        msg.type == "E"
-                        and self._media_management_session is not None
-                    ):
+                    elif msg.type == "E" and self._media_management_session is not None:
                         self._media_management_session._handle_error(
-                            CommandError(
-                                msg.value or "Media Management command failed"
-                            )
+                            CommandError(msg.value or "Media Management command failed")
                         )
                     if (
                         msg.media_management_page is not None
