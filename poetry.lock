@@ -82,19 +82,6 @@ files = [
 ]
 
 [[package]]
-name = "async-timeout"
-version = "5.0.1"
-description = "Timeout context manager for asyncio programs"
-optional = false
-python-versions = ">=3.8"
-groups = ["main"]
-markers = "python_version == \"3.11\""
-files = [
-    {file = "async_timeout-5.0.1-py3-none-any.whl", hash = "sha256:39e3809566ff85354557ec2398b55e096c8364bacac9405a7a1fa429e77fe76c"},
-    {file = "async_timeout-5.0.1.tar.gz", hash = "sha256:d9321a7a3d5a6a5e187e824d2fa0793ce379a202935782d555d6e9d2735677d3"},
-]
-
-[[package]]
 name = "cfgv"
 version = "3.4.0"
 description = "Validate configuration and produce human readable error messages."
@@ -1248,29 +1235,27 @@ files = [
 
 [[package]]
 name = "serialx"
-version = "1.2.2"
-description = "Serial library with native async support for Windows and POSIX"
+version = "1.15.1"
+description = "Serial library with native sync and async support for Windows, Linux, macOS, and other platforms"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "serialx-1.2.2-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:e631258dcec8ac8b94315067a701c178f94e46cb127d2507b83444585452063e"},
-    {file = "serialx-1.2.2-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:ebedd5d2b3a424fffd0cb51771783511612b22b0af3a48768832a1ba7e2e5096"},
-    {file = "serialx-1.2.2-cp310-abi3-win32.whl", hash = "sha256:e2a2992ef9cc7f379731969d914fd51235bca9a460df522200a05f1ce49731b3"},
-    {file = "serialx-1.2.2-cp310-abi3-win_amd64.whl", hash = "sha256:ee4f95d05756bde7a2da8542cf76398a98e21c301d65fa22fb862fbc2536466e"},
-    {file = "serialx-1.2.2-cp310-abi3-win_arm64.whl", hash = "sha256:274c66de672cf96990b72d07798ab942d729e5e5b89fb50091055d03b560baa9"},
-    {file = "serialx-1.2.2-py3-none-any.whl", hash = "sha256:28196d3030e1c962e51c4bb53c27881e07527c6259dbfe2665d97215a194224a"},
-    {file = "serialx-1.2.2.tar.gz", hash = "sha256:a727bcd4f2c7c8c2fd068c0352ab84d8dc94dd1d4a738852b3f10b5e4b8f3111"},
+    {file = "serialx-1.15.1-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:d011884e9440c6495e2b46fa0454db15a6a8600a96e42a21f1d8cee41d3b6cc4"},
+    {file = "serialx-1.15.1-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:f4b548c1bfcd714b1f58ce8e89a6ffd6b366a85594e51a1a30ffc1056125965c"},
+    {file = "serialx-1.15.1-cp310-abi3-win32.whl", hash = "sha256:6b7e269649b5064216e87241654687237bffbfe90bb48e6dd1fca38877c139bc"},
+    {file = "serialx-1.15.1-cp310-abi3-win_amd64.whl", hash = "sha256:78cbfa9e8ddfccf52227064f26ca70d8a6426b8134ec4e53d5c8469ef8690f80"},
+    {file = "serialx-1.15.1-cp310-abi3-win_arm64.whl", hash = "sha256:7c6ec682dd5cbc9ebba8f917bde3f133794c7ef45d2de93e6ddce09583ddb799"},
+    {file = "serialx-1.15.1-py3-none-any.whl", hash = "sha256:3361542c5b85a56bf9f3ca45d0d29e92a7c63aaf7c561e2b195c3cd0dfc909b1"},
+    {file = "serialx-1.15.1.tar.gz", hash = "sha256:689dfbaf55f5f87ea0b6bcdcab135577ce1e70f98d490650b02a8b86eb0b0281"},
 ]
 
 [package.dependencies]
-async-timeout = {version = "*", markers = "python_version < \"3.12\""}
 pywin32 = {version = "*", markers = "platform_system == \"Windows\""}
-typing-extensions = "*"
+typing-extensions = ">=4.13.0"
 
 [package.extras]
-dev = ["aioesphomeapi (>=44.6.0) ; python_version >= \"3.11\"", "pre-commit", "psutil", "pytest", "pytest-asyncio", "pytest-timeout", "pytest-xdist", "ruff"]
-esphome = ["aioesphomeapi (>=44.5.1)"]
+esphome = ["aioesphomeapi (>=46.21.0) ; python_version >= \"3.11\""]
 
 [[package]]
 name = "tomlkit"
