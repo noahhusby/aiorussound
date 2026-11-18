@@ -2,12 +2,14 @@
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 from mashumaro import field_options
 from mashumaro.mixins.orjson import DataClassORJSONMixin
 from mashumaro.types import SerializationStrategy
 from datetime import datetime, UTC
+
+from .mm.models import MediaManagementMenuPage
 
 
 class RussoundBool(SerializationStrategy):
@@ -270,3 +272,4 @@ class RussoundMessage:
     branch: Optional[str] = None
     leaf: Optional[str] = None
     value: Optional[str] = None
+    media_management_page: MediaManagementMenuPage | None = None
